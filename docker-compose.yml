@@ -1,0 +1,103 @@
+version: '3.9'
+
+# TenantFlow — Development Docker Compose
+# REF: docs/SYSTEM_DESIGN.md §13 — Docker Architecture
+# REF: docs/IMPLEMENTATION_ROADMAP.md §3.2 T0.2
+
+services:
+  # ── Express.js Backend ────────────────────────────────────────
+  server:
+    build:
+      context:    ./apps/server
+      dockerfile: Dockerfile
+    container_name: tenantflow-server
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./apps/server:/app
+      - /app/node_modules           # Prevent host node_modules from overwriting container's
+    env_file: .env
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/tenantflow
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:         ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval:     30s
+      timeout:      10s
+      retries:      3
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── React.js Frontend ─────────────────────────────────────────
+  client:
+    build:
+      context:    ./apps/client
+      dockerfile: Dockerfile
+    container_name: tenantflow-client
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/client:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:5000/api/v1
+      - VITE_SOCKET_URL=http://localhost:5000
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  # ── MongoDB 7.0 ───────────────────────────────────────────────
+  mongodb:
+    image:             mongo:7.0
+    container_name:    tenantflow-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/init.js:ro
+    environment:
+      - MONGO_INITDB_DATABASE=tenantflow
+    healthcheck:
+      test:         ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval:     10s
+      timeout:      5s
+      retries:      5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── Redis 7.2 ─────────────────────────────────────────────────
+  redis:
+    image:          redis:7.2-alpine
+    container_name: tenantflow-redis
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:         ["CMD", "redis-cli", "ping"]
+      interval:     10s
+      timeout:      5s
+      retries:      5
+      start_period: 5s
+    restart: unless-stopped
+
+# ── Named Volumes ─────────────────────────────────────────────
+volumes:
+  mongo_data:
+    name: tenantflow_mongo_data
+  redis_data:
+    name: tenantflow_redis_data

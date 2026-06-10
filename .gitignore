@@ -141,3 +141,13 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Internal engineering documentation — never commit
+docs/
+
+# Application logs directory
+logs/
+
+# Production build output
+dist/
+build/
