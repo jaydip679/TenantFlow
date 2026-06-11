@@ -158,9 +158,24 @@ All endpoints are documented in Swagger UI at `GET /api/docs` (development only)
 - **OTP one-time use** — deleted from Redis on first successful verify (max 3 attempts)
 - **bcrypt cost 12** — ~200ms per hash (balanced security vs. performance)
 
----
+### Phase 2 — Plans & Tenant Management Endpoints (✅ Implemented)
 
-## Architecture
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/v1/plans` | None | List all public active plans (sorted by sortOrder) |
+| `GET` | `/api/v1/plans/:planId` | None | Get plan details |
+| `POST` | `/api/v1/plans` | `super_admin` | Create plan (also creates initial PlanVersion v1) |
+| `PATCH` | `/api/v1/plans/:planId` | `super_admin` | Update plan (creates PlanVersion snapshot first) |
+| `DELETE` | `/api/v1/plans/:planId` | `super_admin` | Archive plan (409 if active subscriptions exist) |
+| `GET` | `/api/v1/tenants/:tenantId` | Bearer + scope | Get tenant profile |
+| `PATCH` | `/api/v1/tenants/:tenantId` | Bearer + `tenant_admin` | Update profile (name, billingEmail, address, taxId, timezone) |
+| `POST` | `/api/v1/tenants/:tenantId/logo` | Bearer + `tenant_admin` | Upload logo (200×200 WebP, Cloudinary) |
+| `GET` | `/api/v1/tenants/:tenantId/members` | Bearer + `tenant_admin` | List members (paginated) |
+| `POST` | `/api/v1/tenants/:tenantId/members/invite` | Bearer + `tenant_admin` | Invite member (seat check first) |
+| `POST` | `/api/v1/tenants/:tenantId/members/accept-invite` | None | Accept invite (auto-login) |
+| `DELETE` | `/api/v1/tenants/:tenantId/members/:userId` | Bearer + `tenant_admin` | Remove member (soft-delete) |
+| `PATCH` | `/api/v1/tenants/:tenantId/members/:userId/role` | Bearer + `tenant_admin` | Change member role |
+
 
 - **Pattern:** Modular Monolith — single Node.js process, strict inter-module boundaries
 - **Layers:** Route → Controller (HTTP) → Service (business logic) → Model (data)
@@ -197,7 +212,8 @@ npm test                    # Run all tests
 npm run test:coverage       # Generate coverage report
 ```
 
-**Phase 1 test results:** 18/18 tests passing
+**Phase 2 test results:** 25/25 tests passing
+**Total across all phases:** 43/43 tests passing
 
 ---
 
@@ -207,7 +223,7 @@ npm run test:coverage       # Generate coverage report
 |-------|--------|-----------------|
 | **Phase 0** — Infrastructure & Bootstrap | ✅ **Complete** | Docker, MongoDB, Redis, BullMQ, Swagger, health endpoint, error handling, rate limiting |
 | **Phase 1** — Auth & User Management | ✅ **Complete** | JWT auth, OTP email verify, refresh token rotation + reuse detection, avatar upload, super admin seed, 18 tests |
-| Phase 2 — Plans & Tenant Management | 🔲 Pending | Plan catalog, versioning, tenant CRUD, seat management |
+| **Phase 2** — Plans & Tenant Management | ✅ **Complete** | Plan catalog (versioned), default plans seeder, tenantScope middleware (Redis cache), member invite + seat enforcement, 25 tests |
 | Phase 3 — Subscription Lifecycle | 🔲 Pending | State machine, trial → active, plan upgrades/downgrades |
 | Phase 4 — Invoicing & PDF | 🔲 Pending | Auto-invoice generation, PDFKit, sequential numbering |
 | Phase 5 — Payment Processing | 🔲 Pending | Razorpay orders + webhooks, idempotency |

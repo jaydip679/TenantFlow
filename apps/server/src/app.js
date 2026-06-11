@@ -144,9 +144,12 @@ setupSwagger(app);
 const authRoutes = require('./modules/auth/auth.routes');
 app.use('/api/v1/auth', authRoutes);
 
-// Phase 2 routes added here:
-// app.use('/api/v1/plans', planRoutes);
-// app.use('/api/v1/tenants', tenantRoutes);
+// Phase 2 — Plan Catalog & Tenant Management
+const planRoutes   = require('./modules/plans/plan.routes');
+const tenantRoutes = require('./modules/tenants/tenant.routes');
+app.use('/api/v1/plans',   planRoutes);
+app.use('/api/v1/tenants', tenantRoutes);
+
 
 // ── [10] 404 Handler ──────────────────────────────────────────
 app.all('*', (req, res, next) => {

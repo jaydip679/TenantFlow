@@ -42,10 +42,11 @@ const ERROR_CODES = {
   AUTH_INSUFFICIENT_ROLE:     'AUTH_INSUFFICIENT_ROLE',
 
   // ── Tenant ───────────────────────────────────────────────
-  TENANT_NOT_FOUND:           'TENANT_NOT_FOUND',
-  TENANT_SUSPENDED:           'TENANT_SUSPENDED',
-  TENANT_SCOPE_MISMATCH:      'TENANT_SCOPE_MISMATCH',
-  TENANT_CANCELLED:           'TENANT_CANCELLED',
+  TENANT_NOT_FOUND:                 'TENANT_NOT_FOUND',
+  TENANT_SUSPENDED:                 'TENANT_SUSPENDED',
+  TENANT_SCOPE_MISMATCH:            'TENANT_SCOPE_MISMATCH',
+  TENANT_SCOPE_VIOLATION:           'TENANT_SCOPE_VIOLATION',
+  TENANT_CANCELLED:                 'TENANT_CANCELLED',
 
   // ── Users / Members ──────────────────────────────────────
   USER_NOT_FOUND:             'USER_NOT_FOUND',
@@ -56,9 +57,10 @@ const ERROR_CODES = {
   INVITE_TOKEN_EXPIRED:       'INVITE_TOKEN_EXPIRED',
 
   // ── Plans ────────────────────────────────────────────────
-  PLAN_NOT_FOUND:             'PLAN_NOT_FOUND',
-  PLAN_ARCHIVED:              'PLAN_ARCHIVED',
-  PLAN_HAS_ACTIVE_SUBS:       'PLAN_HAS_ACTIVE_SUBS',
+  PLAN_NOT_FOUND:                      'PLAN_NOT_FOUND',
+  PLAN_ARCHIVED:                       'PLAN_ARCHIVED',
+  PLAN_HAS_ACTIVE_SUBS:                'PLAN_HAS_ACTIVE_SUBS',
+  PLAN_HAS_ACTIVE_SUBSCRIPTIONS:       'PLAN_HAS_ACTIVE_SUBSCRIPTIONS',
 
   // ── Subscriptions ────────────────────────────────────────
   SUBSCRIPTION_NOT_FOUND:           'SUBSCRIPTION_NOT_FOUND',
