@@ -1,41 +1,70 @@
 'use strict';
 
 /**
- * Authenticate Middleware — STUB for Phase 0
+ * Authenticate Middleware — Full Implementation
  *
- * Full implementation in Phase 1 (T1.7).
- * This stub allows the app to boot without Phase 1 being complete.
+ * Validates JWT access tokens on every protected route.
  *
- * Phase 1 implementation will:
+ * Flow:
  *   1. Extract Bearer token from Authorization header
- *   2. Verify JWT signature using JWT_ACCESS_SECRET
- *   3. Check JTI against Redis blacklist (invalidated tokens)
+ *   2. Verify JWT signature + expiry using JWT_ACCESS_SECRET
+ *   3. Check JTI against Redis blacklist (invalidated on logout)
  *   4. Attach req.user = { id, tenantId, role, email, jti }
- *   5. Call next() or throw AppError
  *
  * REF: docs/SYSTEM_DESIGN.md §4 — Authentication & Token Architecture
  * REF: docs/SRS.md §12.1 — authenticate.middleware.js specification
- * REF: docs/IMPLEMENTATION_ROADMAP.md §4.2 T1.7
  */
 
-const { AppError }    = require('../errors/AppError');
-const { ERROR_CODES } = require('../errors/errorCodes');
+const redisClient           = require('../../config/redis');
+const { verifyAccessToken } = require('../utils/jwtService');
+const { AppError }          = require('../errors/AppError');
+const { ERROR_CODES }       = require('../errors/errorCodes');
 
 /**
- * Middleware: Validate JWT access token and attach req.user.
- * @param {import('express').Request}    req
- * @param {import('express').Response}   res
+ * @param {import('express').Request}      req
+ * @param {import('express').Response}     res
  * @param {import('express').NextFunction} next
  */
-const authenticate = (req, res, next) => {
-  // Phase 0 stub — will be fully implemented in Phase 1
-  next(
-    new AppError(
-      'Authentication not yet implemented. Phase 1 pending.',
-      501,
-      ERROR_CODES.INTERNAL_ERROR
-    )
-  );
+const authenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new AppError(
+        'Authentication token is required.',
+        401,
+        ERROR_CODES.AUTH_TOKEN_MISSING
+      );
+    }
+
+    const token = authHeader.slice(7); // Remove "Bearer " prefix
+    const decoded = verifyAccessToken(token); // Throws on invalid/expired
+
+    // Check Redis blacklist — token invalidated on logout
+    const blacklistKey  = `blacklist:at:${decoded.jti}`;
+    const isBlacklisted = await redisClient.get(blacklistKey);
+
+    if (isBlacklisted) {
+      throw new AppError(
+        'This session has been terminated. Please log in again.',
+        401,
+        ERROR_CODES.AUTH_TOKEN_BLACKLISTED
+      );
+    }
+
+    // Attach clean user context to request — used by downstream middleware and controllers
+    req.user = {
+      id:       decoded.sub,
+      tenantId: decoded.tenantId || null,
+      role:     decoded.role,
+      email:    decoded.email,
+      jti:      decoded.jti,
+    };
+
+    next();
+  } catch (err) {
+    next(err);
+  }
 };
 
 module.exports = { authenticate };

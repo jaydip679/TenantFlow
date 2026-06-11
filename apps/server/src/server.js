@@ -37,6 +37,11 @@ const startServer = async () => {
   // Seeds super admin and default plans on first startup.
   await seeder();
 
+  // ── Start BullMQ Workers ────────────────────────────────────
+  // Workers must start after DB + Redis are healthy
+  require('./jobs/email.worker');
+  logger.info('Email worker started');
+
   // ── Create HTTP server ──────────────────────────────────
   const server = http.createServer(app);
 

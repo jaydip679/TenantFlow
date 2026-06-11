@@ -36,7 +36,7 @@ TenantFlow handles:
 | File Storage | Cloudinary |
 | AI | OpenAI GPT-4o / Gemini 1.5 Pro |
 | PDF Generation | PDFKit |
-| Auth Tokens | JWT (HS256, 15-min TTL) |
+| Auth Tokens | JWT HS256 (access, 15min) + Opaque UUID (refresh, 30d) |
 | Containerization | Docker + Docker Compose |
 
 ---
@@ -54,9 +54,9 @@ TenantFlow handles:
 git clone https://github.com/your-org/tenantflow.git
 cd tenantflow
 
-# Copy and configure environment variables
-cp .env.example .env
-# Edit .env with your actual values (Razorpay, Cloudinary, AI keys, SMTP, etc.)
+# Configure environment variables
+cp apps/server/.env.example apps/server/.env
+# Edit apps/server/.env with your actual values (Razorpay, Cloudinary, AI keys, SMTP, etc.)
 ```
 
 ### 2. Start with Docker Compose
@@ -91,68 +91,133 @@ http://localhost:5000/api/docs
 ```
 tenantflow/
 ├── apps/
-│   ├── server/          # Express.js backend
-│   │   └── src/
-│   │       ├── config/      # DB, Redis, BullMQ, Cloudinary, Razorpay
-│   │       ├── modules/     # Domain modules (auth, tenants, plans, ...)
-│   │       ├── shared/      # Middleware, utils, errors, constants
-│   │       ├── models/      # Mongoose models
-│   │       ├── jobs/        # BullMQ workers
-│   │       ├── queues/      # BullMQ queue producers
-│   │       ├── sockets/     # Socket.IO namespaces
-│   │       ├── cron/        # Scheduled jobs
-│   │       ├── app.js       # Express app factory
-│   │       └── server.js    # HTTP server bootstrap
-│   └── client/          # React.js + Vite frontend
-├── docker/              # Nginx config, MongoDB init
-├── docker-compose.yml   # Development environment
+│   ├── server/              # Express.js backend
+│   │   ├── src/
+│   │   │   ├── config/      # DB, Redis, BullMQ, Cloudinary, Razorpay, env validation
+│   │   │   ├── modules/     # Domain modules (auth, tenants, plans, subscriptions, ...)
+│   │   │   │   └── auth/    # ✅ Register, verify-email, login, refresh, logout,
+│   │   │   │                #    forgot/reset-password, /me, /me/avatar
+│   │   │   ├── shared/      # Middleware, utils, errors, constants
+│   │   │   │   ├── errors/  # AppError, errorCodes
+│   │   │   │   ├── middleware/ # authenticate, authorize, rateLimiter, validate, upload
+│   │   │   │   └── utils/   # logger, jwtService, otpService, cryptoUtils, slugify,
+│   │   │   │                #    auditLogService, asyncHandler
+│   │   │   ├── models/      # Mongoose models (User, Tenant, RefreshToken, AuditLog)
+│   │   │   ├── jobs/        # BullMQ workers + email HTML templates
+│   │   │   ├── queues/      # BullMQ queue producers
+│   │   │   ├── sockets/     # Socket.IO namespaces (Phase 7)
+│   │   │   ├── cron/        # Scheduled jobs (Phase 6+)
+│   │   │   ├── app.js       # Express app factory — 11-step middleware chain
+│   │   │   └── server.js    # HTTP server bootstrap + graceful shutdown
+│   │   ├── .env             # Local env (never committed)
+│   │   └── package.json
+│   └── client/              # React.js + Vite frontend (Phase 10)
+├── docker/                  # Nginx config, MongoDB init scripts
+├── docker-compose.yml       # Development environment
 ├── docker-compose.prod.yml  # Production environment
-├── CONTEXT.md           # Living architectural decision log
 └── README.md
 ```
 
 ---
 
-## Environment Variables
+## API Reference
 
-Copy `.env.example` to `.env` and configure all required variables.
+All endpoints are documented in Swagger UI at `GET /api/docs` (development only).
 
-See `apps/server/src/config/env.js` for the complete list with validation rules.
+### Phase 1 — Auth Endpoints (✅ Implemented)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/v1/auth/register` | None | Register tenant admin — creates Tenant + User atomically, sends OTP |
+| `POST` | `/api/v1/auth/verify-email` | None | Verify OTP, auto-login, get access token + refresh cookie |
+| `POST` | `/api/v1/auth/login` | None | Login with email + password |
+| `POST` | `/api/v1/auth/refresh` | Cookie | Rotate refresh token, get new access token |
+| `POST` | `/api/v1/auth/logout` | Bearer | Blacklist JTI, invalidate refresh token, clear cookie |
+| `POST` | `/api/v1/auth/forgot-password` | None | Request password reset OTP (always 200) |
+| `POST` | `/api/v1/auth/reset-password` | None | Reset password, invalidate all sessions |
+| `GET`  | `/api/v1/auth/me` | Bearer | Get current user profile |
+| `PATCH`| `/api/v1/auth/me` | Bearer | Update firstName, lastName, notification preferences |
+| `POST` | `/api/v1/auth/me/avatar` | Bearer | Upload avatar (Cloudinary, 150×150 WebP crop) |
+
+### Rate Limiting
+
+| Tier | Limit | Applied To |
+|------|-------|------------|
+| Auth | 10 requests / 15 min per IP | `/auth/register`, `/auth/login`, `/auth/verify-email`, `/auth/forgot-password`, `/auth/reset-password` |
+| Global | 100 requests / 15 min per IP | All other endpoints |
+
+---
+
+## Security Highlights
+
+- **Timing-safe login** — dummy `bcrypt.compare` executed when user not found (prevents email enumeration)
+- **Refresh token rotation** — every `/auth/refresh` issues a new token; old one is invalidated
+- **Reuse detection** — if a consumed refresh token is replayed, the entire token family is invalidated
+- **HttpOnly refresh cookie** — scoped to `/api/v1/auth/refresh`, never sent on other requests
+- **JTI blacklist** — logout blacklists the access token's JWT ID in Redis until natural expiry
+- **OTP one-time use** — deleted from Redis on first successful verify (max 3 attempts)
+- **bcrypt cost 12** — ~200ms per hash (balanced security vs. performance)
 
 ---
 
 ## Architecture
 
 - **Pattern:** Modular Monolith — single Node.js process, strict inter-module boundaries
-- **MVC + Service Layer:** Controllers handle HTTP, Services contain all business logic, Models define data shape
-- **Tenant Isolation:** 4-layer enforcement (JWT → Middleware → Service params → Mongoose pre-hooks)
-- **Financial data:** All monetary values stored as paise (integer) — no floating-point money arithmetic
+- **Layers:** Route → Controller (HTTP) → Service (business logic) → Model (data)
+- **Rule:** Services never accept `req` or `res` objects — plain JS data in, plain data out
+- **Tenant Isolation:** 4-layer enforcement — JWT payload → `tenantScope` middleware → Service params → Mongoose pre-hooks
+- **Financial data:** All monetary values stored as **paise (integer)** — no floating-point money arithmetic
 
 ---
 
-## API Documentation
+## Environment Variables
 
-Available at `GET /api/docs` (development only) — Swagger UI with interactive API explorer.
+Copy `apps/server/.env.example` to `apps/server/.env` and configure all required variables.
+
+| Category | Variables |
+|----------|-----------|
+| App | `NODE_ENV`, `PORT`, `CLIENT_URL` |
+| Database | `MONGODB_URI`, `REDIS_URL` |
+| Auth | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` |
+| Payments | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` |
+| File Storage | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` |
+| AI | `AI_PROVIDER`, `OPENAI_API_KEY` or `GEMINI_API_KEY` |
+| Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` |
+| Admin | `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, `BULL_BOARD_USERNAME`, `BULL_BOARD_PASSWORD` |
+
+See `apps/server/src/config/env.js` for full list with Joi validation rules.
+
+---
+
+## Running Tests
+
+```bash
+cd apps/server
+npm test                    # Run all tests
+npm run test:coverage       # Generate coverage report
+```
+
+**Phase 1 test results:** 18/18 tests passing
 
 ---
 
 ## Implementation Progress
 
-| Phase | Status |
-|-------|--------|
-| Phase 0 — Infrastructure & Bootstrap | ✅ Complete |
-| Phase 1 — Auth & User Management | 🔲 Pending |
-| Phase 2 — Plans & Tenant Management | 🔲 Pending |
-| Phase 3 — Subscription Lifecycle | 🔲 Pending |
-| Phase 4 — Invoicing & PDF | 🔲 Pending |
-| Phase 5 — Payment Processing | 🔲 Pending |
-| Phase 6 — Dunning Workflow | 🔲 Pending |
-| Phase 7 — Notifications | 🔲 Pending |
-| Phase 8 — AI Integration | 🔲 Pending |
-| Phase 9 — Admin Dashboard | 🔲 Pending |
-| Phase 10 — Frontend Completion | 🔲 Pending |
-| Phase 11 — Production Hardening | 🔲 Pending |
+| Phase | Status | Key Deliverables |
+|-------|--------|-----------------|
+| **Phase 0** — Infrastructure & Bootstrap | ✅ **Complete** | Docker, MongoDB, Redis, BullMQ, Swagger, health endpoint, error handling, rate limiting |
+| **Phase 1** — Auth & User Management | ✅ **Complete** | JWT auth, OTP email verify, refresh token rotation + reuse detection, avatar upload, super admin seed, 18 tests |
+| Phase 2 — Plans & Tenant Management | 🔲 Pending | Plan catalog, versioning, tenant CRUD, seat management |
+| Phase 3 — Subscription Lifecycle | 🔲 Pending | State machine, trial → active, plan upgrades/downgrades |
+| Phase 4 — Invoicing & PDF | 🔲 Pending | Auto-invoice generation, PDFKit, sequential numbering |
+| Phase 5 — Payment Processing | 🔲 Pending | Razorpay orders + webhooks, idempotency |
+| Phase 6 — Dunning Workflow | 🔲 Pending | 4-step retry, tenant suspension, dunning emails |
+| Phase 7 — Notifications | 🔲 Pending | Socket.IO real-time, notification persistence |
+| Phase 8 — AI Integration | 🔲 Pending | Nightly churn scoring, OpenAI/Gemini |
+| Phase 9 — Admin Dashboard | 🔲 Pending | MRR/ARR analytics, Bull Board |
+| Phase 10 — Frontend Completion | 🔲 Pending | React dashboard, billing portal |
+| Phase 11 — Production Hardening | 🔲 Pending | CI/CD, monitoring, security audit |
 
 ---
 
-*Engineering decisions and architectural notes maintained in `CONTEXT.md`.*
+*Engineering decisions and architectural notes maintained in `docs/CONTEXT.md`.*

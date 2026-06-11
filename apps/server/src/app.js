@@ -28,6 +28,7 @@ const helmet   = require('helmet');
 const cors     = require('cors');
 const morgan   = require('morgan');
 const mongoose = require('mongoose');
+const cookieParser = require('cookie-parser');
 
 const { globalRateLimiter }   = require('./shared/middleware/rateLimiter.middleware');
 const { requestIdMiddleware }  = require('./shared/middleware/requestId.middleware');
@@ -79,6 +80,10 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
 // ── [5] Request ID ───────────────────────────────────────────
 app.use(requestIdMiddleware);
+
+// ── [5.5] Cookie Parser ───────────────────────────────────────
+// Required for reading HttpOnly refresh token cookie on /auth/refresh
+app.use(cookieParser());
 
 // ── [6] HTTP Request Logger (Morgan → Winston) ───────────────
 app.use(
@@ -135,17 +140,13 @@ app.get('/health', async (req, res) => {
 setupSwagger(app);
 
 // ── [9] API Routes ────────────────────────────────────────────
-// Routes are mounted here as phases are implemented.
-// Format: app.use('/api/v1/{resource}', {resource}Routes);
-//
 // Phase 1: Auth routes
-// app.use('/api/v1/auth', authRoutes);
-//
-// Phase 2: Plans + Tenants routes
+const authRoutes = require('./modules/auth/auth.routes');
+app.use('/api/v1/auth', authRoutes);
+
+// Phase 2 routes added here:
 // app.use('/api/v1/plans', planRoutes);
 // app.use('/api/v1/tenants', tenantRoutes);
-//
-// (Additional phases add routes here — see IMPLEMENTATION_ROADMAP.md)
 
 // ── [10] 404 Handler ──────────────────────────────────────────
 app.all('*', (req, res, next) => {
