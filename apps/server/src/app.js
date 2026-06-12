@@ -150,6 +150,10 @@ const tenantRoutes = require('./modules/tenants/tenant.routes');
 app.use('/api/v1/plans',   planRoutes);
 app.use('/api/v1/tenants', tenantRoutes);
 
+// Phase 3 — Subscription Lifecycle
+const subscriptionRoutes = require('./modules/subscriptions/subscription.routes');
+app.use('/api/v1/subscriptions', subscriptionRoutes);
+
 
 // ── [10] 404 Handler ──────────────────────────────────────────
 app.all('*', (req, res, next) => {
