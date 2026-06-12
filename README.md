@@ -176,6 +176,20 @@ All endpoints are documented in Swagger UI at `GET /api/docs` (development only)
 | `DELETE` | `/api/v1/tenants/:tenantId/members/:userId` | Bearer + `tenant_admin` | Remove member (soft-delete) |
 | `PATCH` | `/api/v1/tenants/:tenantId/members/:userId/role` | Bearer + `tenant_admin` | Change member role |
 
+### Phase 3 — Subscription Lifecycle Endpoints (✅ Implemented)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/v1/subscriptions/:tenantId` | Bearer + scope | Get current subscription (populated planVersion) |
+| `POST` | `/api/v1/subscriptions/:tenantId/upgrade` | Bearer + `tenant_admin` | Upgrade plan (MongoDB transaction, proration invoice) |
+| `POST` | `/api/v1/subscriptions/:tenantId/downgrade` | Bearer + `tenant_admin` | Schedule downgrade to cheaper plan |
+| `DELETE` | `/api/v1/subscriptions/:tenantId/cancel-downgrade` | Bearer + `tenant_admin` | Cancel pending downgrade |
+| `POST` | `/api/v1/subscriptions/:tenantId/cancel` | Bearer + `tenant_admin` | Cancel (immediate or at period end) |
+| `POST` | `/api/v1/subscriptions/:tenantId/reactivate` | Bearer + `tenant_admin` | Reactivate cancelled subscription |
+| `POST` | `/api/v1/subscriptions/:tenantId/pause` | Bearer + `tenant_admin` | Pause subscription |
+| `POST` | `/api/v1/subscriptions/:tenantId/resume` | Bearer + `tenant_admin` | Resume paused subscription |
+| `GET` | `/api/v1/subscriptions/:tenantId/events` | Bearer + scope | Subscription event history (paginated) |
+
 
 - **Pattern:** Modular Monolith — single Node.js process, strict inter-module boundaries
 - **Layers:** Route → Controller (HTTP) → Service (business logic) → Model (data)
@@ -212,8 +226,8 @@ npm test                    # Run all tests
 npm run test:coverage       # Generate coverage report
 ```
 
-**Phase 2 test results:** 25/25 tests passing
-**Total across all phases:** 43/43 tests passing
+**Phase 3 test results:** 25/25 tests passing
+**Total across all phases:** 68/68 tests passing
 
 ---
 
@@ -224,7 +238,7 @@ npm run test:coverage       # Generate coverage report
 | **Phase 0** — Infrastructure & Bootstrap | ✅ **Complete** | Docker, MongoDB, Redis, BullMQ, Swagger, health endpoint, error handling, rate limiting |
 | **Phase 1** — Auth & User Management | ✅ **Complete** | JWT auth, OTP email verify, refresh token rotation + reuse detection, avatar upload, super admin seed, 18 tests |
 | **Phase 2** — Plans & Tenant Management | ✅ **Complete** | Plan catalog (versioned), default plans seeder, tenantScope middleware (Redis cache), member invite + seat enforcement, 25 tests |
-| Phase 3 — Subscription Lifecycle | 🔲 Pending | State machine, trial → active, plan upgrades/downgrades |
+| **Phase 3** — Subscription Lifecycle | ✅ **Complete** | State machine, proration (integer paise), upgrade/downgrade/cancel/pause/resume, MongoDB transactions, 25 tests |
 | Phase 4 — Invoicing & PDF | 🔲 Pending | Auto-invoice generation, PDFKit, sequential numbering |
 | Phase 5 — Payment Processing | 🔲 Pending | Razorpay orders + webhooks, idempotency |
 | Phase 6 — Dunning Workflow | 🔲 Pending | 4-step retry, tenant suspension, dunning emails |
