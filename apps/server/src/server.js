@@ -37,10 +37,21 @@ const startServer = async () => {
   // Seeds super admin and default plans on first startup.
   await seeder();
 
-  // ── Start BullMQ Workers ────────────────────────────────────
+  // ── Start BullMQ Workers ────────────────────────────────────────
   // Workers must start after DB + Redis are healthy
   require('./jobs/email.worker');
   logger.info('Email worker started');
+
+  // Phase 4 workers
+  require('./jobs/invoice.worker');
+  logger.info('Invoice worker started');
+
+  require('./jobs/pdf.worker');
+  logger.info('PDF worker started');
+
+  // Phase 4 — Billing Renewal Cron (daily at 01:00 UTC)
+  const { initBillingRenewCron } = require('./cron/billingRenew.cron');
+  initBillingRenewCron();
 
   // ── Create HTTP server ──────────────────────────────────
   const server = http.createServer(app);
