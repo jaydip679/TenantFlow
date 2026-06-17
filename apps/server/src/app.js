@@ -154,6 +154,11 @@ app.use('/api/v1/tenants', tenantRoutes);
 const subscriptionRoutes = require('./modules/subscriptions/subscription.routes');
 app.use('/api/v1/subscriptions', subscriptionRoutes);
 
+// Phase 4 — Invoicing & PDF Generation
+const invoiceRoutes = require('./modules/invoices/invoice.routes');
+app.use('/api/v1/invoices', invoiceRoutes);
+
+
 
 // ── [10] 404 Handler ──────────────────────────────────────────
 app.all('*', (req, res, next) => {
