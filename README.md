@@ -190,6 +190,17 @@ All endpoints are documented in Swagger UI at `GET /api/docs` (development only)
 | `POST` | `/api/v1/subscriptions/:tenantId/resume` | Bearer + `tenant_admin` | Resume paused subscription |
 | `GET` | `/api/v1/subscriptions/:tenantId/events` | Bearer + scope | Subscription event history (paginated) |
 
+### Phase 4 — Invoicing & PDF Endpoints (✅ Implemented)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/v1/invoices/admin/all` | Bearer + `super_admin` | All invoices across tenants |
+| `GET` | `/api/v1/invoices/tenant/:tenantId` | Bearer + `tenant_admin` | List tenant invoices (filterable) |
+| `GET` | `/api/v1/invoices/:invoiceId` | Bearer | Get invoice detail |
+| `GET` | `/api/v1/invoices/:invoiceId/pdf` | Bearer | Get signed PDF URL (202 if not ready) |
+| `POST` | `/api/v1/invoices/:invoiceId/void` | Bearer + `super_admin` | Void an open invoice |
+| `POST` | `/api/v1/invoices/:invoiceId/send` | Bearer + `tenant_admin` | Resend invoice email |
+
 
 - **Pattern:** Modular Monolith — single Node.js process, strict inter-module boundaries
 - **Layers:** Route → Controller (HTTP) → Service (business logic) → Model (data)
@@ -226,8 +237,8 @@ npm test                    # Run all tests
 npm run test:coverage       # Generate coverage report
 ```
 
-**Phase 3 test results:** 25/25 tests passing
-**Total across all phases:** 68/68 tests passing
+**Phase 4 test results:** 16/16 tests passing
+**Total across all phases:** 84/84 tests passing
 
 ---
 
@@ -239,7 +250,7 @@ npm run test:coverage       # Generate coverage report
 | **Phase 1** — Auth & User Management | ✅ **Complete** | JWT auth, OTP email verify, refresh token rotation + reuse detection, avatar upload, super admin seed, 18 tests |
 | **Phase 2** — Plans & Tenant Management | ✅ **Complete** | Plan catalog (versioned), default plans seeder, tenantScope middleware (Redis cache), member invite + seat enforcement, 25 tests |
 | **Phase 3** — Subscription Lifecycle | ✅ **Complete** | State machine, proration (integer paise), upgrade/downgrade/cancel/pause/resume, MongoDB transactions, 25 tests |
-| Phase 4 — Invoicing & PDF | 🔲 Pending | Auto-invoice generation, PDFKit, sequential numbering |
+| **Phase 4** — Invoicing & PDF | ✅ **Complete** | Invoice model, atomic INV number, PDFKit A4 template, Redis lock idempotency, billing cron, 16 tests |
 | Phase 5 — Payment Processing | 🔲 Pending | Razorpay orders + webhooks, idempotency |
 | Phase 6 — Dunning Workflow | 🔲 Pending | 4-step retry, tenant suspension, dunning emails |
 | Phase 7 — Notifications | 🔲 Pending | Socket.IO real-time, notification persistence |
