@@ -49,4 +49,41 @@ const timingSafeEqual = (a, b) => {
   return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
 };
 
-module.exports = { sha256, hmacSha256, timingSafeEqual };
+/**
+ * Verify Razorpay payment signature (client checkout flow).
+ * Signature = HMAC-SHA256(orderId + "|" + paymentId, RAZORPAY_KEY_SECRET)
+ * @param {string} orderId   - razorpayOrderId
+ * @param {string} paymentId - razorpayPaymentId
+ * @param {string} signature - razorpaySignature from client
+ * @returns {boolean}
+ */
+const verifyRazorpaySignature = (orderId, paymentId, signature) => {
+  const expected = hmacSha256(`${orderId}|${paymentId}`, process.env.RAZORPAY_KEY_SECRET);
+  return timingSafeEqual(expected, signature);
+};
+
+/**
+ * Verify Razorpay webhook signature.
+ * Signature = HMAC-SHA256(rawBody, RAZORPAY_WEBHOOK_SECRET)
+ * rawBody MUST be the exact Buffer/string before JSON.parse (use express.raw()).
+ * @param {Buffer|string} rawBody
+ * @param {string}        signature - X-Razorpay-Signature header
+ * @returns {boolean}
+ */
+const verifyRazorpayWebhookSignature = (rawBody, signature) => {
+  const expected = crypto
+    .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET)
+    .update(rawBody)
+    .digest('hex');
+  return timingSafeEqual(expected, signature);
+};
+
+/**
+ * Hash a token using SHA-256 (semantic alias for sha256).
+ * Used for refresh token storage (store hash, not raw token).
+ * @param {string} token
+ * @returns {string}
+ */
+const hashToken = (token) => sha256(token);
+
+module.exports = { sha256, hmacSha256, timingSafeEqual, verifyRazorpaySignature, verifyRazorpayWebhookSignature, hashToken };

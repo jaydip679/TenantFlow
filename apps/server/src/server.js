@@ -53,6 +53,10 @@ const startServer = async () => {
   const { initBillingRenewCron } = require('./cron/billingRenew.cron');
   initBillingRenewCron();
 
+  // Phase 5 workers
+  require('./jobs/payment.worker');
+  logger.info('Payment worker started');
+
   // ── Create HTTP server ──────────────────────────────────
   const server = http.createServer(app);
 
