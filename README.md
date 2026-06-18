@@ -201,6 +201,16 @@ All endpoints are documented in Swagger UI at `GET /api/docs` (development only)
 | `POST` | `/api/v1/invoices/:invoiceId/void` | Bearer + `super_admin` | Void an open invoice |
 | `POST` | `/api/v1/invoices/:invoiceId/send` | Bearer + `tenant_admin` | Resend invoice email |
 
+### Phase 5 — Payment Processing Endpoints (✅ Implemented)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/v1/payments/orders` | Bearer + `tenant_admin` | Create Razorpay order for invoice |
+| `POST` | `/api/v1/payments/verify` | Bearer + `tenant_admin` | Verify payment signature, enqueue processing |
+| `GET` | `/api/v1/payments/history/:tenantId` | Bearer + `tenant_admin` | Paginated payment history |
+| `POST` | `/api/v1/payments/refund/:transactionId` | Bearer + `super_admin` | Initiate Razorpay refund |
+| `POST` | `/api/v1/payments/webhook` | None (IP + HMAC) | Razorpay webhook receiver |
+
 
 - **Pattern:** Modular Monolith — single Node.js process, strict inter-module boundaries
 - **Layers:** Route → Controller (HTTP) → Service (business logic) → Model (data)
@@ -237,8 +247,8 @@ npm test                    # Run all tests
 npm run test:coverage       # Generate coverage report
 ```
 
-**Phase 4 test results:** 16/16 tests passing
-**Total across all phases:** 84/84 tests passing
+**Phase 5 test results:** 17/17 tests passing
+**Total across all phases:** 101/101 tests passing
 
 ---
 
@@ -251,7 +261,7 @@ npm run test:coverage       # Generate coverage report
 | **Phase 2** — Plans & Tenant Management | ✅ **Complete** | Plan catalog (versioned), default plans seeder, tenantScope middleware (Redis cache), member invite + seat enforcement, 25 tests |
 | **Phase 3** — Subscription Lifecycle | ✅ **Complete** | State machine, proration (integer paise), upgrade/downgrade/cancel/pause/resume, MongoDB transactions, 25 tests |
 | **Phase 4** — Invoicing & PDF | ✅ **Complete** | Invoice model, atomic INV number, PDFKit A4 template, Redis lock idempotency, billing cron, 16 tests |
-| Phase 5 — Payment Processing | 🔲 Pending | Razorpay orders + webhooks, idempotency |
+| **Phase 5** — Payment Processing | ✅ **Complete** | Razorpay orders, HMAC webhook verification, idempotency via WebhookLog, payment worker, refund flow, 17 tests |
 | Phase 6 — Dunning Workflow | 🔲 Pending | 4-step retry, tenant suspension, dunning emails |
 | Phase 7 — Notifications | 🔲 Pending | Socket.IO real-time, notification persistence |
 | Phase 8 — AI Integration | 🔲 Pending | Nightly churn scoring, OpenAI/Gemini |
