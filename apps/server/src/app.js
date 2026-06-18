@@ -158,6 +158,9 @@ app.use('/api/v1/subscriptions', subscriptionRoutes);
 const invoiceRoutes = require('./modules/invoices/invoice.routes');
 app.use('/api/v1/invoices', invoiceRoutes);
 
+// Phase 5 — Payment Processing
+const paymentRoutes = require('./modules/payments/payment.routes');
+app.use('/api/v1/payments', paymentRoutes);
 
 
 // ── [10] 404 Handler ──────────────────────────────────────────
