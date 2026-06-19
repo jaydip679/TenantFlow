@@ -211,6 +211,14 @@ All endpoints are documented in Swagger UI at `GET /api/docs` (development only)
 | `POST` | `/api/v1/payments/refund/:transactionId` | Bearer + `super_admin` | Initiate Razorpay refund |
 | `POST` | `/api/v1/payments/webhook` | None (IP + HMAC) | Razorpay webhook receiver |
 
+### Phase 6 — Dunning Workflow Admin Endpoints (✅ Implemented)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/v1/admin/dunning` | Bearer + `super_admin` | List active dunning records |
+| `POST` | `/api/v1/admin/dunning/:dunningId/reset` | Bearer + `super_admin` | Reset dunning to step 0, immediate retry |
+| `POST` | `/api/v1/admin/dunning/:dunningId/abandon` | Bearer + `super_admin` | Abandon dunning, suspend tenant |
+
 
 - **Pattern:** Modular Monolith — single Node.js process, strict inter-module boundaries
 - **Layers:** Route → Controller (HTTP) → Service (business logic) → Model (data)
@@ -247,8 +255,8 @@ npm test                    # Run all tests
 npm run test:coverage       # Generate coverage report
 ```
 
-**Phase 5 test results:** 17/17 tests passing
-**Total across all phases:** 101/101 tests passing
+**Phase 6 test results:** 13/13 tests passing
+**Total across all phases:** 114/114 tests passing
 
 ---
 
@@ -262,7 +270,7 @@ npm run test:coverage       # Generate coverage report
 | **Phase 3** — Subscription Lifecycle | ✅ **Complete** | State machine, proration (integer paise), upgrade/downgrade/cancel/pause/resume, MongoDB transactions, 25 tests |
 | **Phase 4** — Invoicing & PDF | ✅ **Complete** | Invoice model, atomic INV number, PDFKit A4 template, Redis lock idempotency, billing cron, 16 tests |
 | **Phase 5** — Payment Processing | ✅ **Complete** | Razorpay orders, HMAC webhook verification, idempotency via WebhookLog, payment worker, refund flow, 17 tests |
-| Phase 6 — Dunning Workflow | 🔲 Pending | 4-step retry, tenant suspension, dunning emails |
+| **Phase 6** — Dunning Workflow | ✅ **Complete** | 4-step state machine (0/3/7/14 days), Redis per-record lock, tenant suspension, admin reset/abandon, 13 tests |
 | Phase 7 — Notifications | 🔲 Pending | Socket.IO real-time, notification persistence |
 | Phase 8 — AI Integration | 🔲 Pending | Nightly churn scoring, OpenAI/Gemini |
 | Phase 9 — Admin Dashboard | 🔲 Pending | MRR/ARR analytics, Bull Board |
