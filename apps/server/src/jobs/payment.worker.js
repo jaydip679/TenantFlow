@@ -94,15 +94,16 @@ const processPaymentJob = async (job) => {
         logger.info({ tenantId: invoice.tenantId }, 'Tenant restored from past_due to active after payment');
       }
 
-      // ── 4. Resolve DunningRecord (Phase 6 stub) ───────────
+      // ── 4. Resolve DunningRecord (Phase 6) ─────────────────
       try {
+        const dunningService = require('../modules/payments/dunning.service');
         const DunningRecord = require('../models/DunningRecord.model');
-        await DunningRecord.findOneAndUpdate(
-          { invoiceId: invoice._id, status: 'active' },
-          { status: 'resolved', resolvedAt: new Date() }
-        );
+        const activeDunning = await DunningRecord.findOne({ invoiceId: invoice._id, status: 'active' });
+        if (activeDunning) {
+          await dunningService.resolveDunning(activeDunning._id.toString(), transaction.razorpayPaymentId);
+        }
       } catch (err) {
-        logger.warn({ err: err.message }, 'DunningRecord resolve skipped (Phase 6 stub)');
+        logger.warn({ err: err.message }, 'DunningRecord resolve failed');
       }
 
       // ── 5. Audit Log ─────────────────────────────────────
@@ -152,11 +153,17 @@ const processPaymentJob = async (job) => {
     transaction.errorDescription  = payload?.payment?.entity?.error_description || null;
     await transaction.save();
 
-    // Phase 6 stub: create/advance DunningRecord (log only)
-    logger.info(
-      { invoiceId: transaction.invoiceId, tenantId: transaction.tenantId },
-      '[Phase 6 stub] payment.failed — DunningRecord creation/advance will be here'
-    );
+    // Phase 6: initiate dunning workflow
+    try {
+      const dunningService = require('../modules/payments/dunning.service');
+      await dunningService.initiateDunning(
+        transaction.tenantId.toString(),
+        transaction.subscriptionId.toString(),
+        transaction.invoiceId.toString()
+      );
+    } catch (err) {
+      logger.warn({ err: err.message, invoiceId: transaction.invoiceId }, 'Dunning initiation failed');
+    }
 
     // Enqueue payment failed email
     try {

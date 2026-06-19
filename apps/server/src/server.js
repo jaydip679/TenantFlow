@@ -57,6 +57,14 @@ const startServer = async () => {
   require('./jobs/payment.worker');
   logger.info('Payment worker started');
 
+  // Phase 6 workers
+  require('./jobs/dunning.worker');
+  logger.info('Dunning worker started');
+
+  // Phase 6 — Dunning Check Cron (daily at 08:00 UTC)
+  const { initDunningCheckCron } = require('./cron/dunningCheck.cron');
+  initDunningCheckCron();
+
   // ── Create HTTP server ──────────────────────────────────
   const server = http.createServer(app);
 
