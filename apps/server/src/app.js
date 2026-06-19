@@ -162,6 +162,9 @@ app.use('/api/v1/invoices', invoiceRoutes);
 const paymentRoutes = require('./modules/payments/payment.routes');
 app.use('/api/v1/payments', paymentRoutes);
 
+// Phase 6 — Dunning Workflow (admin endpoints)
+const dunningRoutes = require('./modules/payments/dunning.routes');
+app.use('/api/v1/admin/dunning', dunningRoutes);
 
 // ── [10] 404 Handler ──────────────────────────────────────────
 app.all('*', (req, res, next) => {
