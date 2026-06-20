@@ -166,6 +166,10 @@ app.use('/api/v1/payments', paymentRoutes);
 const dunningRoutes = require('./modules/payments/dunning.routes');
 app.use('/api/v1/admin/dunning', dunningRoutes);
 
+// Phase 7 — Notifications
+const notificationRoutes = require('./modules/notifications/notification.routes');
+app.use('/api/v1/notifications', notificationRoutes);
+
 // ── [10] 404 Handler ──────────────────────────────────────────
 app.all('*', (req, res, next) => {
   next(
