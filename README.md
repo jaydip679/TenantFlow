@@ -219,6 +219,20 @@ All endpoints are documented in Swagger UI at `GET /api/docs` (development only)
 | `POST` | `/api/v1/admin/dunning/:dunningId/reset` | Bearer + `super_admin` | Reset dunning to step 0, immediate retry |
 | `POST` | `/api/v1/admin/dunning/:dunningId/abandon` | Bearer + `super_admin` | Abandon dunning, suspend tenant |
 
+### Phase 7 — Notification Endpoints (✅ Implemented)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/v1/notifications` | Bearer | List notifications (paginated, isRead filter) |
+| `GET` | `/api/v1/notifications/unread-count` | Bearer | Get unread count for badge |
+| `PATCH` | `/api/v1/notifications/:id/read` | Bearer | Mark single notification as read |
+| `PATCH` | `/api/v1/notifications/read-all` | Bearer | Mark all notifications as read |
+| `DELETE` | `/api/v1/notifications/:id` | Bearer | Delete single notification |
+
+**Socket.IO:**
+- `/notifications` namespace — authenticated users; `user:{id}` + `tenant:{id}` rooms
+- `/admin` namespace — super_admin only; `admin:global` room; non-admins immediately disconnected
+
 
 - **Pattern:** Modular Monolith — single Node.js process, strict inter-module boundaries
 - **Layers:** Route → Controller (HTTP) → Service (business logic) → Model (data)
@@ -255,8 +269,8 @@ npm test                    # Run all tests
 npm run test:coverage       # Generate coverage report
 ```
 
-**Phase 6 test results:** 13/13 tests passing
-**Total across all phases:** 114/114 tests passing
+**Phase 7 test results:** 15/15 tests passing
+**Total across all phases:** 129/129 tests passing
 
 ---
 
@@ -271,7 +285,7 @@ npm run test:coverage       # Generate coverage report
 | **Phase 4** — Invoicing & PDF | ✅ **Complete** | Invoice model, atomic INV number, PDFKit A4 template, Redis lock idempotency, billing cron, 16 tests |
 | **Phase 5** — Payment Processing | ✅ **Complete** | Razorpay orders, HMAC webhook verification, idempotency via WebhookLog, payment worker, refund flow, 17 tests |
 | **Phase 6** — Dunning Workflow | ✅ **Complete** | 4-step state machine (0/3/7/14 days), Redis per-record lock, tenant suspension, admin reset/abandon, 13 tests |
-| Phase 7 — Notifications | 🔲 Pending | Socket.IO real-time, notification persistence |
+| **Phase 7** — Real-Time Notifications | ✅ **Complete** | Socket.IO /notifications + /admin namespaces, JWT handshake auth, Notification model TTL 90d, REST API 5 endpoints, 15 tests |
 | Phase 8 — AI Integration | 🔲 Pending | Nightly churn scoring, OpenAI/Gemini |
 | Phase 9 — Admin Dashboard | 🔲 Pending | MRR/ARR analytics, Bull Board |
 | Phase 10 — Frontend Completion | 🔲 Pending | React dashboard, billing portal |
