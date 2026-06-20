@@ -65,13 +65,25 @@ const startServer = async () => {
   const { initDunningCheckCron } = require('./cron/dunningCheck.cron');
   initDunningCheckCron();
 
-  // ── Create HTTP server ──────────────────────────────────
+  // ── Create HTTP server ──────────────────────────────
+  // MUST be created before Socket.IO initialization (Phase 7)
   const server = http.createServer(app);
 
-  // ── Start listening ─────────────────────────────────────
+  // Phase 7 — Socket.IO (MUST be initialized before notification worker)
+  const { initializeSocketIO } = require('./sockets');
+  const io = initializeSocketIO(server);
+  app.set('io', io);  // Make io accessible in workers via app.get('io')
+  logger.info('Socket.IO initialized');
+
+  // Phase 7 workers
+  require('./jobs/notification.worker');
+  logger.info('Notification worker started');
+
+  // ── Start listening ───────────────────────────────
   server.listen(PORT, () => {
     logger.info(`TenantFlow server running on port ${PORT} [${process.env.NODE_ENV}]`);
     logger.info(`Health check: http://localhost:${PORT}/health`);
+    logger.info(`Socket.IO:    ws://localhost:${PORT}/notifications`);
 
     if (process.env.NODE_ENV !== 'production') {
       logger.info(`Swagger UI:   http://localhost:${PORT}/api/docs`);
