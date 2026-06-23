@@ -233,6 +233,20 @@ All endpoints are documented in Swagger UI at `GET /api/docs` (development only)
 - `/notifications` namespace — authenticated users; `user:{id}` + `tenant:{id}` rooms
 - `/admin` namespace — super_admin only; `admin:global` room; non-admins immediately disconnected
 
+### Phase 8 — AI Integration Endpoints (✅ Implemented)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/v1/ai/churn/:tenantId` | Bearer + `super_admin` | Get latest churn score (Redis cache, 1hr TTL) |
+| `GET` | `/api/v1/ai/churn/all` | Bearer + `super_admin` | All churn scores sorted by risk desc |
+| `POST` | `/api/v1/ai/churn/trigger/:tenantId` | Bearer + `super_admin` | Manually trigger churn analysis job |
+| `POST` | `/api/v1/ai/chat` | Bearer + `tenant_admin` | AI billing assistant (SSE streaming, Growth+ plan) |
+
+**Background:**
+- Nightly `churnAnalysis.cron.js` at 03:00 UTC — batches of 10 tenants with 1s delay
+- `ai.worker.js` (concurrency 3) — calls OpenAI/Gemini, upserts TenantChurnScore, caches in Redis
+- Proactive outreach email when churnRiskScore > 75 (idempotent)
+
 
 - **Pattern:** Modular Monolith — single Node.js process, strict inter-module boundaries
 - **Layers:** Route → Controller (HTTP) → Service (business logic) → Model (data)
@@ -269,8 +283,8 @@ npm test                    # Run all tests
 npm run test:coverage       # Generate coverage report
 ```
 
-**Phase 7 test results:** 15/15 tests passing
-**Total across all phases:** 129/129 tests passing
+**Phase 8 test results:** 14/14 tests passing
+**Total across all phases:** 144/144 tests passing
 
 ---
 
@@ -286,7 +300,7 @@ npm run test:coverage       # Generate coverage report
 | **Phase 5** — Payment Processing | ✅ **Complete** | Razorpay orders, HMAC webhook verification, idempotency via WebhookLog, payment worker, refund flow, 17 tests |
 | **Phase 6** — Dunning Workflow | ✅ **Complete** | 4-step state machine (0/3/7/14 days), Redis per-record lock, tenant suspension, admin reset/abandon, 13 tests |
 | **Phase 7** — Real-Time Notifications | ✅ **Complete** | Socket.IO /notifications + /admin namespaces, JWT handshake auth, Notification model TTL 90d, REST API 5 endpoints, 15 tests |
-| Phase 8 — AI Integration | 🔲 Pending | Nightly churn scoring, OpenAI/Gemini |
+| **Phase 8** — AI Integration | ✅ **Complete** | OpenAI/Gemini dual provider, churn analysis + SSE billing chat, nightly cron (batched 10/tenant), Redis cache, proactive outreach email, 14 tests |
 | Phase 9 — Admin Dashboard | 🔲 Pending | MRR/ARR analytics, Bull Board |
 | Phase 10 — Frontend Completion | 🔲 Pending | React dashboard, billing portal |
 | Phase 11 — Production Hardening | 🔲 Pending | CI/CD, monitoring, security audit |
