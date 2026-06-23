@@ -103,6 +103,10 @@ const ERROR_CODES = {
   AI_PROVIDER_ERROR:          'AI_PROVIDER_ERROR',
   AI_RESPONSE_INVALID:        'AI_RESPONSE_INVALID',
   AI_FEATURE_DISABLED:        'AI_FEATURE_DISABLED',
+  AI_SERVICE_UNAVAILABLE:     'AI_SERVICE_UNAVAILABLE',   // 503 — AI API is down
+  FEATURE_NOT_AVAILABLE:      'FEATURE_NOT_AVAILABLE',    // 403 — Plan doesn't include feature
+  AI_CONFIG_ERROR:            'AI_CONFIG_ERROR',           // 500 — Invalid AI_PROVIDER config
+  AI_PARSE_ERROR:             'AI_PARSE_ERROR',            // 500 — AI returned unparseable JSON
 
   // ── Webhooks ─────────────────────────────────────────────
   WEBHOOK_SIGNATURE_INVALID:  'WEBHOOK_SIGNATURE_INVALID',

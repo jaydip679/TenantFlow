@@ -170,6 +170,10 @@ app.use('/api/v1/admin/dunning', dunningRoutes);
 const notificationRoutes = require('./modules/notifications/notification.routes');
 app.use('/api/v1/notifications', notificationRoutes);
 
+// Phase 8 — AI Integration
+const aiRoutes = require('./modules/ai/ai.routes');
+app.use('/api/v1/ai', aiRoutes);
+
 // ── [10] 404 Handler ──────────────────────────────────────────
 app.all('*', (req, res, next) => {
   next(
