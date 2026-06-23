@@ -79,6 +79,14 @@ const startServer = async () => {
   require('./jobs/notification.worker');
   logger.info('Notification worker started');
 
+  // Phase 8 workers
+  require('./jobs/ai.worker');
+  logger.info('AI worker started');
+
+  // Phase 8 — Churn Analysis Cron (daily at 03:00 UTC)
+  const { initChurnAnalysisCron } = require('./cron/churnAnalysis.cron');
+  initChurnAnalysisCron();
+
   // ── Start listening ───────────────────────────────
   server.listen(PORT, () => {
     logger.info(`TenantFlow server running on port ${PORT} [${process.env.NODE_ENV}]`);
