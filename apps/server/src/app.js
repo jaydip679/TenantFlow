@@ -38,6 +38,7 @@ const { ERROR_CODES }          = require('./shared/errors/errorCodes');
 const { setupSwagger }         = require('./docs/swagger.config');
 const logger                   = require('./shared/utils/logger');
 const redisClient              = require('./config/redis');
+const basicAuth                = require('express-basic-auth');
 
 const app = express();
 
@@ -173,6 +174,59 @@ app.use('/api/v1/notifications', notificationRoutes);
 // Phase 8 — AI Integration
 const aiRoutes = require('./modules/ai/ai.routes');
 app.use('/api/v1/ai', aiRoutes);
+
+// Phase 9 — Admin Dashboard & Analytics
+const adminRoutes = require('./modules/admin/admin.routes');
+app.use('/api/v1/admin', adminRoutes);
+
+// Phase 9 — Bull Board (queue monitor UI)
+// Mounted at /admin/queues (separate from /api/v1 to avoid JWT middleware)
+// Protected by HTTP Basic Auth (BULL_BOARD_USERNAME / BULL_BOARD_PASSWORD)
+(() => {
+  try {
+    const { createBullBoard }  = require('@bull-board/api');
+    const { BullMQAdapter }    = require('@bull-board/api/bullMQAdapter');
+    const { ExpressAdapter }   = require('@bull-board/express');
+
+    const { emailQueue }        = require('./queues/email.queue');
+    const { invoiceQueue }      = require('./queues/invoice.queue');
+    const { pdfQueue }          = require('./queues/pdf.queue');
+    const { paymentQueue }      = require('./queues/payment.queue');
+    const { dunningQueue }      = require('./queues/dunning.queue');
+    const { notificationQueue } = require('./queues/notification.queue');
+    const { aiQueue }           = require('./queues/ai.queue');
+
+    const serverAdapter = new ExpressAdapter();
+    serverAdapter.setBasePath('/admin/queues');
+
+    createBullBoard({
+      queues: [
+        new BullMQAdapter(emailQueue),
+        new BullMQAdapter(invoiceQueue),
+        new BullMQAdapter(pdfQueue),
+        new BullMQAdapter(paymentQueue),
+        new BullMQAdapter(dunningQueue),
+        new BullMQAdapter(notificationQueue),
+        new BullMQAdapter(aiQueue),
+      ],
+      serverAdapter,
+    });
+
+    const bbUser  = process.env.BULL_BOARD_USERNAME;
+    const bbPass  = process.env.BULL_BOARD_PASSWORD;
+    const bbUsers = bbUser && bbPass ? { [bbUser]: bbPass } : { admin: 'changeme' };
+
+    app.use(
+      '/admin/queues',
+      basicAuth({ users: bbUsers, challenge: true, realm: 'TenantFlow Bull Board' }),
+      serverAdapter.getRouter()
+    );
+
+    logger.info('Bull Board mounted at /admin/queues');
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Bull Board failed to initialize — queue monitor unavailable');
+  }
+})();
 
 // ── [10] 404 Handler ──────────────────────────────────────────
 app.all('*', (req, res, next) => {
