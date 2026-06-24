@@ -247,6 +247,18 @@ All endpoints are documented in Swagger UI at `GET /api/docs` (development only)
 - `ai.worker.js` (concurrency 3) — calls OpenAI/Gemini, upserts TenantChurnScore, caches in Redis
 - Proactive outreach email when churnRiskScore > 75 (idempotent)
 
+### Phase 9 — Admin Dashboard & Analytics Endpoints (✅ Implemented)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/v1/admin/metrics` | Bearer + `super_admin` | MRR, ARR, churn rate, subscription counts |
+| `GET` | `/api/v1/admin/tenants` | Bearer + `super_admin` | Tenant list with sub+plan+churn summary (filterable) |
+| `GET` | `/api/v1/admin/tenants/:tenantId` | Bearer + `super_admin` | Full tenant detail: members, invoices, timeline, churn |
+| `PATCH` | `/api/v1/admin/tenants/:tenantId/status` | Bearer + `super_admin` | Force status change (admin override + AuditLog) |
+| `GET` | `/api/v1/admin/invoices` | Bearer + `super_admin` | Cross-tenant invoice list (filterable by status/tenant) |
+| `GET` | `/api/v1/admin/queues` | Bearer + `super_admin` | BullMQ queue depths for all 7 queues |
+| `GET` | `/admin/queues` | HTTP Basic Auth | Bull Board queue monitor UI |
+
 
 - **Pattern:** Modular Monolith — single Node.js process, strict inter-module boundaries
 - **Layers:** Route → Controller (HTTP) → Service (business logic) → Model (data)
@@ -283,8 +295,8 @@ npm test                    # Run all tests
 npm run test:coverage       # Generate coverage report
 ```
 
-**Phase 8 test results:** 14/14 tests passing
-**Total across all phases:** 144/144 tests passing
+**Phase 9 test results:** 12/12 tests passing
+**Total across all phases:** 155/155 tests passing
 
 ---
 
@@ -301,7 +313,7 @@ npm run test:coverage       # Generate coverage report
 | **Phase 6** — Dunning Workflow | ✅ **Complete** | 4-step state machine (0/3/7/14 days), Redis per-record lock, tenant suspension, admin reset/abandon, 13 tests |
 | **Phase 7** — Real-Time Notifications | ✅ **Complete** | Socket.IO /notifications + /admin namespaces, JWT handshake auth, Notification model TTL 90d, REST API 5 endpoints, 15 tests |
 | **Phase 8** — AI Integration | ✅ **Complete** | OpenAI/Gemini dual provider, churn analysis + SSE billing chat, nightly cron (batched 10/tenant), Redis cache, proactive outreach email, 14 tests |
-| Phase 9 — Admin Dashboard | 🔲 Pending | MRR/ARR analytics, Bull Board |
+| **Phase 9** — Admin Dashboard & Analytics | ✅ **Complete** | MRR/ARR aggregation (annual normalized), tenant list+detail+force-status, cross-tenant invoices, BullMQ queue stats, Bull Board UI, 12 tests |
 | Phase 10 — Frontend Completion | 🔲 Pending | React dashboard, billing portal |
 | Phase 11 — Production Hardening | 🔲 Pending | CI/CD, monitoring, security audit |
 
