@@ -54,9 +54,10 @@ TenantFlow handles:
 git clone https://github.com/your-org/tenantflow.git
 cd tenantflow
 
-# Configure environment variables
+# Copy and fill in the environment template (all variables documented inline)
 cp apps/server/.env.example apps/server/.env
-# Edit apps/server/.env with your actual values (Razorpay, Cloudinary, AI keys, SMTP, etc.)
+# Edit apps/server/.env — minimum required: MONGODB_URI, REDIS_URL, JWT secrets,
+# RAZORPAY_*, CLOUDINARY_*, AI_PROVIDER + key, SMTP_*, SUPER_ADMIN_*
 ```
 
 ### 2. Start with Docker Compose
@@ -86,7 +87,58 @@ http://localhost:5000/api/docs
 
 ---
 
-## Project Structure
+## Deployment
+
+### Docker Compose (self-hosted)
+
+```bash
+# Build and start all services in production mode
+docker compose -f docker-compose.prod.yml up -d
+
+# View logs
+docker compose -f docker-compose.prod.yml logs -f server
+```
+
+Production stack: **Nginx** (reverse proxy, WebSocket upgrade, Razorpay IP whitelist) → **Express** (port 5000) → **MongoDB** + **Redis**. The React app is served as a static build inside the client container via Nginx.
+
+### GitHub Actions CI/CD
+
+Two workflows are included in `.github/workflows/`:
+
+| Workflow | Trigger | What it does |
+|----------|---------|-------------|
+| `ci.yml` | Push / PR to `main` | Spins up MongoDB + Redis, runs all 155+ tests |
+| `deploy.yml` | Push to `main` (after CI) | Builds Docker images → pushes to `ghcr.io` → SSH-deploys to server |
+
+To activate the deploy workflow, add these **GitHub Secrets**:
+```
+DEPLOY_HOST      → your server IP
+DEPLOY_USER      → SSH username (e.g. ubuntu)
+DEPLOY_SSH_KEY   → private SSH key contents
+DEPLOY_PATH      → server path (e.g. /opt/tenantflow)
+```
+
+---
+
+## Environment Variables
+
+All variables are validated at startup. The server refuses to start if any required variable is missing.
+See [`apps/server/.env.example`](apps/server/.env.example) for the full reference with inline documentation.
+
+| Group | Key variables |
+|-------|---------------|
+| **Server** | `NODE_ENV`, `PORT`, `CLIENT_URL` |
+| **Database** | `MONGODB_URI`, `REDIS_URL` |
+| **Auth** | `JWT_ACCESS_SECRET` (32+ chars), `JWT_REFRESH_SECRET` (32+ chars) |
+| **Razorpay** | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` |
+| **Cloudinary** | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` |
+| **AI** | `AI_PROVIDER` (`openai`\|`gemini`), `OPENAI_API_KEY` or `GEMINI_API_KEY` |
+| **SMTP** | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` |
+| **Seed** | `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD` |
+| **Bull Board** | `BULL_BOARD_USERNAME`, `BULL_BOARD_PASSWORD` |
+
+---
+
 
 ```
 tenantflow/
@@ -330,7 +382,7 @@ npm run test:coverage       # Generate coverage report
 | **Phase 8** — AI Integration | ✅ **Complete** | OpenAI/Gemini dual provider, churn analysis + SSE billing chat, nightly cron (batched 10/tenant), Redis cache, proactive outreach email, 14 tests |
 | **Phase 9** — Admin Dashboard & Analytics | ✅ **Complete** | MRR/ARR aggregation (annual normalized), tenant list+detail+force-status, cross-tenant invoices, BullMQ queue stats, Bull Board UI, 12 tests |
 | **Phase 10** — Frontend Completion | ✅ **Complete** | Landing page, auth flows (OTP), tenant dashboard, admin dashboard, AI chat widget (SSE), Razorpay checkout, dunning/churn UI, Socket.IO notification bell, role-based protected routes, Vite build clean |
-| Phase 11 — Production Hardening | 🔲 Pending | CI/CD, monitoring, security audit |
+| **Phase 11** — Production Hardening | ✅ **Complete** | `Dockerfile.prod` (client multi-stage), `.env.example` (30 vars), GitHub Actions CI + deploy workflows, Helmet CSP tightened, E2E tests (auth flow + subscription billing, Razorpay mocked) |
 
 ---
 
