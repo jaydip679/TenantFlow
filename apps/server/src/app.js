@@ -48,11 +48,15 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc:  ["'self'", "'unsafe-inline'"],  // Allow Swagger UI inline scripts
-        styleSrc:   ["'self'", "'unsafe-inline'"],
-        imgSrc:     ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
+        defaultSrc:  ["'self'"],
+        // Razorpay checkout script loaded by the React client — allow their CDN
+        scriptSrc:   ["'self'", 'https://checkout.razorpay.com'],
+        styleSrc:    ["'self'", "'unsafe-inline'"],  // Swagger UI requires unsafe-inline
+        imgSrc:      ["'self'", 'data:', 'https://res.cloudinary.com', 'https:'],
+        // Allow API calls to Razorpay from the backend proxy + Socket.IO self
+        connectSrc:  ["'self'", 'https://api.razorpay.com'],
+        frameSrc:    ['https://api.razorpay.com'],   // Razorpay payment iframe
+        fontSrc:     ["'self'", 'https:', 'data:'],
       },
     },
     crossOriginEmbedderPolicy: false, // Required for Swagger UI compatibility
