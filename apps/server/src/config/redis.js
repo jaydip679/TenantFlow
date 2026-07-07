@@ -43,11 +43,15 @@ const retryStrategy = (times) => {
   return delay;
 };
 
+const isTLS = REDIS_URL && REDIS_URL.startsWith('rediss://');
+
 const redisClient = new Redis(REDIS_URL, {
   retryStrategy,
-  maxRetriesPerRequest: null, // Required for BullMQ compat if ever shared — null disables per-request limit
+  maxRetriesPerRequest: null,
   enableReadyCheck:     true,
   lazyConnect:          false,
+  // Required for Upstash (rediss://) — disables strict cert verification
+  tls: isTLS ? { rejectUnauthorized: false } : undefined,
 });
 
 redisClient.on('ready', () => {

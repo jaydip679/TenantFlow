@@ -23,12 +23,15 @@ const { URL } = require('url');
  */
 const parseRedisUrl = (redisUrl) => {
   const parsed = new URL(redisUrl);
+  const isTLS  = parsed.protocol === 'rediss:';
   return {
     host:     parsed.hostname || 'localhost',
     port:     parseInt(parsed.port, 10) || 6379,
     password: parsed.password || undefined,
     db:       parsed.pathname ? parseInt(parsed.pathname.slice(1), 10) || 0 : 0,
-    maxRetriesPerRequest: null, // Required by BullMQ
+    // Required for Upstash (rediss://) — disables strict cert verification
+    tls:      isTLS ? { rejectUnauthorized: false } : undefined,
+    maxRetriesPerRequest: null,  // Required by BullMQ
     enableReadyCheck:     false, // Required by BullMQ
   };
 };

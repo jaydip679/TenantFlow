@@ -64,9 +64,32 @@ app.use(
 );
 
 // ── [2] CORS ─────────────────────────────────────────────────
+// CLIENT_URL supports comma-separated origins:
+//   e.g. CLIENT_URL=http://localhost:3000,http://localhost:5173
+// In development, all localhost ports are allowed automatically.
+const allowedOrigins = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map((u) => u.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin:      process.env.CLIENT_URL,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, Postman, mobile apps)
+      if (!origin) return callback(null, true);
+
+      // In development — allow any localhost port
+      if (process.env.NODE_ENV === 'development' && /^http:\/\/localhost:\d+$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow explicitly listed origins
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
     credentials: true, // Required for HttpOnly refresh token cookies
     methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],

@@ -36,9 +36,22 @@ const { registerAdminNamespace }         = require('./admin.namespace');
  * @returns {import('socket.io').Server}
  */
 const initializeSocketIO = (httpServer) => {
+  // Multi-origin support — same list as HTTP CORS (CLIENT_URL may be comma-separated)
+  const allowedOrigins = (process.env.CLIENT_URL || '')
+    .split(',')
+    .map((u) => u.trim())
+    .filter(Boolean);
+
   const io = new Server(httpServer, {
     cors: {
-      origin:      process.env.CLIENT_URL,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (process.env.NODE_ENV === 'development' && /^http:\/\/localhost:\d+$/.test(origin)) {
+          return callback(null, true);
+        }
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error(`Socket.IO CORS: origin '${origin}' not allowed`));
+      },
       credentials: true,
     },
     transports: ['websocket', 'polling'],

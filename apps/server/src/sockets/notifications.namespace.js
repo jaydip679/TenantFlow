@@ -29,6 +29,14 @@ const registerNotificationsNamespace = (io) => {
   const nsp = io.of('/notifications');
 
   nsp.on('connection', (socket) => {
+    // Guard: auth middleware may not have populated socket.user
+    // (e.g. missing/expired token). Disconnect cleanly instead of crashing.
+    if (!socket.user) {
+      logger.warn({ socketId: socket.id }, 'Socket connected to /notifications without user — disconnecting');
+      socket.disconnect(true);
+      return;
+    }
+
     const { id: userId, tenantId, role } = socket.user;
 
     // Every user joins their personal room

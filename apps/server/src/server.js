@@ -18,6 +18,9 @@
  * REF: docs/SYSTEM_DESIGN.md §2 — Production Folder Structure
  */
 
+// ── Load .env file into process.env BEFORE any validation ────────────────────
+require('dotenv').config();
+
 // ── MUST be FIRST import — validates all env vars or crashes ─
 require('./config/env');
 
@@ -135,11 +138,33 @@ const startServer = async () => {
   // ── Unhandled Rejections / Exceptions ───────────────────
   // Log and exit — let the process manager (Docker / PM2) restart.
   process.on('unhandledRejection', (reason, promise) => {
-    logger.error({ reason: String(reason), promise }, 'Unhandled Promise Rejection');
+    const msg = String(reason);
+    // Ignore Redis connection errors — ioredis retries automatically.
+    // A Redis blip must not bring down the entire server.
+    if (
+      msg.includes('Connection is closed') ||
+      msg.includes('ECONNRESET') ||
+      msg.includes('ECONNREFUSED') ||
+      msg.includes('Redis connection')
+    ) {
+      logger.warn({ msg }, 'Ignoring Redis connection rejection — ioredis will retry');
+      return;
+    }
+    logger.error({ reason: msg, promise }, 'Unhandled Promise Rejection — shutting down');
     gracefulShutdown('unhandledRejection');
   });
 
   process.on('uncaughtException', (err) => {
+    // Socket.IO errors from unauthenticated/bad connections are non-fatal
+    if (
+      err.message?.includes('socket.user') ||
+      err.message?.includes('Socket.IO') ||
+      err.stack?.includes('socket.io') ||
+      err.stack?.includes('notifications.namespace')
+    ) {
+      logger.warn({ err: err.message }, 'Ignoring non-fatal Socket.IO error');
+      return;
+    }
     logger.error({ err: err.message, stack: err.stack }, 'Uncaught Exception — shutting down');
     gracefulShutdown('uncaughtException');
   });
