@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { register as registerApi, verifyOtp } from '../../services/authService.js';
 
 export default function RegisterPage() {
-  const [step, setStep] = useState(1); // 1=company info, 2=verify OTP
+  const [step, setStep] = useState(1); // 1=account info, 2=verify OTP
   const [email, setEmail] = useState('');
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,11 +17,21 @@ export default function RegisterPage() {
     setLoading(true);
     setServerError('');
     try {
-      await registerApi(data);
+      // Backend expects: { firstName, lastName, email, password, companyName }
+      await registerApi({
+        firstName:   data.firstName,
+        lastName:    data.lastName,
+        email:       data.email,
+        password:    data.password,
+        companyName: data.companyName,
+      });
       setEmail(data.email);
       setStep(2);
     } catch (err) {
-      setServerError(err.response?.data?.message || 'Registration failed. Please try again.');
+      const msg = err.response?.data?.message
+        || err.response?.data?.errors?.[0]?.message
+        || 'Registration failed. Please try again.';
+      setServerError(msg);
     } finally {
       setLoading(false);
     }
@@ -60,16 +70,40 @@ export default function RegisterPage() {
           <>
             <h2 className="form-section-title">Create your account</h2>
             <form onSubmit={handleSubmit(onRegister)} className="auth-form">
-              <div className="form-group">
-                <label className="form-label">Full Name</label>
-                <input
-                  id="name"
-                  type="text"
-                  className={`form-input ${errors.name ? 'is-invalid' : ''}`}
-                  placeholder="John Doe"
-                  {...register('name', { required: 'Name is required', minLength: { value: 2, message: 'Minimum 2 characters' } })}
-                />
-                {errors.name && <span className="form-error">{errors.name.message}</span>}
+
+              {/* First Name + Last Name side by side */}
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">First Name</label>
+                  <input
+                    id="firstName"
+                    type="text"
+                    className={`form-input ${errors.firstName ? 'is-invalid' : ''}`}
+                    placeholder="John"
+                    {...register('firstName', {
+                      required: 'First name is required',
+                      minLength: { value: 2, message: 'Minimum 2 characters' },
+                      pattern: { value: /^[a-zA-Z\s'-]+$/, message: 'Letters only' },
+                    })}
+                  />
+                  {errors.firstName && <span className="form-error">{errors.firstName.message}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Last Name</label>
+                  <input
+                    id="lastName"
+                    type="text"
+                    className={`form-input ${errors.lastName ? 'is-invalid' : ''}`}
+                    placeholder="Doe"
+                    {...register('lastName', {
+                      required: 'Last name is required',
+                      minLength: { value: 2, message: 'Minimum 2 characters' },
+                      pattern: { value: /^[a-zA-Z\s'-]+$/, message: 'Letters only' },
+                    })}
+                  />
+                  {errors.lastName && <span className="form-error">{errors.lastName.message}</span>}
+                </div>
               </div>
 
               <div className="form-group">
@@ -79,7 +113,10 @@ export default function RegisterPage() {
                   type="text"
                   className={`form-input ${errors.companyName ? 'is-invalid' : ''}`}
                   placeholder="Acme Corp"
-                  {...register('companyName', { required: 'Company name is required' })}
+                  {...register('companyName', {
+                    required: 'Company name is required',
+                    minLength: { value: 2, message: 'Minimum 2 characters' },
+                  })}
                 />
                 {errors.companyName && <span className="form-error">{errors.companyName.message}</span>}
               </div>
@@ -105,13 +142,14 @@ export default function RegisterPage() {
                   id="password"
                   type="password"
                   className={`form-input ${errors.password ? 'is-invalid' : ''}`}
-                  placeholder="Min. 8 characters"
+                  placeholder="Min. 8 chars with uppercase, number & symbol"
                   {...register('password', {
                     required: 'Password is required',
                     minLength: { value: 8, message: 'Minimum 8 characters' },
                     pattern: {
-                      value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-                      message: 'Must contain uppercase, lowercase, and number',
+                      // Must match backend Joi: uppercase + lowercase + digit + special char
+                      value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&^#\-_]).+$/,
+                      message: 'Must contain uppercase, lowercase, number & special character (@$!%*?&)',
                     },
                   })}
                 />

@@ -6,7 +6,8 @@ import { setCredentials } from '../../store/authSlice.js';
 import { login } from '../../services/authService.js';
 
 export default function LoginPage() {
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register, handleSubmit, watch, formState: { errors } } = useForm();
+  const typedEmail = watch('email') || '';  // track what user typed
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
   const dispatch = useDispatch();
@@ -77,7 +78,12 @@ export default function LoginPage() {
           </div>
 
           <div className="form-footer">
-            <Link to="/forgot-password" className="link-subtle">Forgot password?</Link>
+            <Link
+              to={`/forgot-password${typedEmail ? `?email=${encodeURIComponent(typedEmail)}` : ''}`}
+              className="link-subtle"
+            >
+              Forgot password?
+            </Link>
           </div>
 
           <button
