@@ -42,7 +42,7 @@ const paymentTransactionSchema = new Schema(
     razorpayPaymentId: {
       type:    String,
       default: null,
-      sparse:  true,  // Allows multiple null values; unique when non-null
+      // Index defined below via schema.index() with unique:true + sparse:true
     },
     razorpaySignature: {
       type:   String,

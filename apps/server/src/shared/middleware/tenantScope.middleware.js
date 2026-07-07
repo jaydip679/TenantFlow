@@ -93,16 +93,28 @@ const tenantScope = (options = {}) =>
         throw new AppError('Tenant not found.', 404, ERROR_CODES.NOT_FOUND);
       }
 
+      // Convert Mongoose Map → plain object safely.
+      // lean() may return a plain object (already iterable) or a Mongoose Map.
+      // Array.from() handles both cases without crashing.
+      let featuresObj = {};
+      if (tenant.features) {
+        try {
+          featuresObj = tenant.features instanceof Map
+            ? Object.fromEntries(Array.from(tenant.features))
+            : Object.fromEntries(Object.entries(tenant.features));
+        } catch {
+          featuresObj = {};
+        }
+      }
+
       req.tenantContext = {
         tenantId,
         status:             tenant.status,
         planId:             subscription?.planId?.toString()   || null,
         subscriptionStatus: subscription?.status               || null,
-        seatLimit:          subscription?.seatCount            || (tenant.features?.get?.('max_seats') ?? 0),
+        seatLimit:          subscription?.seatCount            || (featuresObj?.max_seats ?? 0),
         usedSeats,
-        features:           tenant.features
-          ? Object.fromEntries(tenant.features)
-          : {},
+        features:           featuresObj,
       };
 
       // 5. Populate cache
