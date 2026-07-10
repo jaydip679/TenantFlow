@@ -21,9 +21,16 @@ export default function SubscriptionPage() {
 
   useEffect(() => {
     if (!tenantId) return;
-    Promise.all([getSubscription(tenantId), getPlans()])
+    Promise.all([
+      getSubscription(tenantId).catch((err) => {
+        // 404 = no subscription yet — treat as empty, not an error
+        if (err.response?.status === 404) return null;
+        throw err;
+      }),
+      getPlans(),
+    ])
       .then(([subRes, planRes]) => {
-        setSub(subRes.data.data);
+        setSub(subRes?.data?.data ?? null);
         setPlans(planRes.data.data?.planVersions || planRes.data.data?.plans || []);
       })
       .catch(() => setError('Failed to load subscription data.'))
@@ -95,6 +102,17 @@ export default function SubscriptionPage() {
 
         {error && <div className="alert alert-danger">{error}</div>}
         {toast && <div className="alert alert-success">{toast}</div>}
+
+        {/* No subscription yet */}
+        {!sub && !error && !loading && (
+          <div className="card" style={{ marginBottom: 28, textAlign: 'center', padding: '40px 28px' }}>
+            <CreditCard size={40} style={{ color: 'var(--color-primary)', marginBottom: 12, opacity: 0.6 }} />
+            <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>No Active Plan</h2>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 14, margin: 0 }}>
+              You don't have a subscription yet. Choose a plan below to get started.
+            </p>
+          </div>
+        )}
 
         {/* Current Plan */}
         {sub && (

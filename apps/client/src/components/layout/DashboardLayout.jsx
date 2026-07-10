@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -11,6 +11,8 @@ import {
   Menu,
   X,
   Zap,
+  User,
+  ChevronDown,
 } from "lucide-react";
 import { logout } from "../../store/authSlice.js";
 import NotificationBell from "../notifications/NotificationBell.jsx";
@@ -24,6 +26,15 @@ const BG_CARD         = "rgba(255,255,255,0.035)";
 const BORDER          = "rgba(255,255,255,0.08)";
 const TEXT_PRIMARY    = "#f0f0ff";
 const TEXT_MUTED      = "#8b8bad";
+
+const dropItemStyle = {
+  display: 'flex', alignItems: 'center', gap: 10,
+  width: '100%', padding: '9px 16px', border: 'none',
+  background: 'transparent', color: '#c4c4d4', cursor: 'pointer',
+  fontSize: 13, fontWeight: 500, textAlign: 'left',
+  transition: 'background 0.15s',
+};
+
 
 const navItems = [
   { to: "/dashboard",              icon: LayoutDashboard, label: "Dashboard" },
@@ -160,11 +171,24 @@ function TopBar({ sidebarWidth }) {
   const dispatch  = useDispatch();
   const navigate  = useNavigate();
   const { user }  = useSelector((s) => s.auth);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   function handleLogout() {
     dispatch(logout());
     navigate("/login", { replace: true });
   }
+
+  const initials = `${(user?.firstName || user?.name || 'U')[0]}${(user?.lastName || '')[0] || ''}`.toUpperCase();
 
   return (
     <header
@@ -187,7 +211,7 @@ function TopBar({ sidebarWidth }) {
       <div>
         <p style={{ margin: 0, fontSize: 13, color: TEXT_MUTED, fontWeight: 400 }}>Welcome back,</p>
         <p style={{ margin: 0, fontSize: 16, color: TEXT_PRIMARY, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.01em" }}>
-          {user?.tenantName ?? user?.name ?? "Tenant"}
+          {user?.tenantName ?? user?.firstName ?? user?.name ?? "Tenant"}
         </p>
       </div>
 
@@ -195,45 +219,74 @@ function TopBar({ sidebarWidth }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <NotificationBell />
 
-        {/* Avatar chip */}
-        <div
-          style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "6px 10px", borderRadius: 50,
-            background: BG_CARD, border: `1px solid ${BORDER}`,
-          }}
-        >
-          <div
+        {/* Avatar chip — clickable dropdown */}
+        <div ref={menuRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
             style={{
-              width: 28, height: 28, borderRadius: "50%",
-              background: `linear-gradient(135deg, ${ACCENT}, #a78bfa)`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, color: "#fff",
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "6px 12px 6px 6px", borderRadius: 50,
+              background: BG_CARD, border: `1px solid ${menuOpen ? 'rgba(108,99,255,0.5)' : BORDER}`,
+              cursor: 'pointer', transition: 'border-color 0.15s',
             }}
+            aria-label="User menu"
           >
-            {(user?.name ?? "U")[0].toUpperCase()}
-          </div>
-          <span style={{ fontSize: 13, fontWeight: 500, color: TEXT_PRIMARY }}>
-            {user?.name ?? "User"}
-          </span>
-        </div>
+            <div
+              style={{
+                width: 28, height: 28, borderRadius: "50%",
+                background: `linear-gradient(135deg, ${ACCENT}, #a78bfa)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: 700, color: "#fff",
+              }}
+            >
+              {initials}
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 500, color: TEXT_PRIMARY }}>
+              {user?.firstName || user?.name || "User"}
+            </span>
+            <ChevronDown size={14} color={TEXT_MUTED} style={{ transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+          </button>
 
-        <button
-          onClick={handleLogout}
-          title="Sign out"
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "8px 14px", borderRadius: 9, border: "none",
-            background: "rgba(239,68,68,0.12)",
-            color: "#f87171", cursor: "pointer", fontSize: 13, fontWeight: 500,
-            transition: "background 0.15s",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.22)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; }}
-        >
-          <LogOut size={15} />
-          Sign out
-        </button>
+          {/* Dropdown */}
+          {menuOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+              minWidth: 180, borderRadius: 12, overflow: 'hidden',
+              background: '#1a1a2e', border: `1px solid ${BORDER}`,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              zIndex: 200,
+            }}>
+              {/* User info header */}
+              <div style={{ padding: '12px 16px', borderBottom: `1px solid ${BORDER}` }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY }}>{user?.firstName} {user?.lastName}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: TEXT_MUTED }}>{user?.email}</p>
+              </div>
+
+              {/* Menu items */}
+              <div style={{ padding: '6px 0' }}>
+                <button
+                  onClick={() => { setMenuOpen(false); navigate('/dashboard/profile'); }}
+                  style={dropItemStyle}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(108,99,255,0.12)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <User size={14} />
+                  View Profile
+                </button>
+                <div style={{ height: 1, background: BORDER, margin: '4px 0' }} />
+                <button
+                  onClick={handleLogout}
+                  style={{ ...dropItemStyle, color: '#f87171' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <LogOut size={14} />
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

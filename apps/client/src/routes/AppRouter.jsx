@@ -17,6 +17,7 @@ const InvoicesPage        = lazy(() => import("../pages/billing/InvoicesPage.jsx
 const PaymentsPage        = lazy(() => import("../pages/billing/PaymentHistoryPage.jsx"));
 const SubscriptionPage    = lazy(() => import("../pages/settings/SubscriptionPage.jsx"));
 const MembersPage         = lazy(() => import("../pages/settings/MembersPage.jsx"));
+const ProfilePage         = lazy(() => import("../pages/settings/ProfilePage.jsx"));
 
 const AdminDashboardPage  = lazy(() => import("../pages/admin/AdminDashboardPage.jsx"));
 const AdminTenantsPage    = lazy(() => import("../pages/admin/TenantsPage.jsx"));
@@ -81,6 +82,7 @@ export default function AppRouter() {
           <Route path="/dashboard/payments"     element={<TRoute element={<PaymentsPage />} />} />
           <Route path="/dashboard/subscription" element={<TRoute element={<SubscriptionPage />} />} />
           <Route path="/dashboard/members"      element={<TRoute element={<MembersPage />} />} />
+          <Route path="/dashboard/profile"      element={<TRoute element={<ProfilePage />} />} />
 
           {/* Super Admin */}
           <Route path="/admin"                         element={<ARoute element={<AdminDashboardPage />} />} />
