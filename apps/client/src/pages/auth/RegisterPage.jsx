@@ -28,8 +28,9 @@ export default function RegisterPage() {
       setEmail(data.email);
       setStep(2);
     } catch (err) {
-      const msg = err.response?.data?.message
-        || err.response?.data?.errors?.[0]?.message
+      const msg = err.response?.data?.message           // top-level message
+        || err.response?.data?.error?.message           // { error: { message } } shape
+        || err.response?.data?.errors?.[0]?.message     // validation array shape
         || 'Registration failed. Please try again.';
       setServerError(msg);
     } finally {

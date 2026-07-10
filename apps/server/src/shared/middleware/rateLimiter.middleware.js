@@ -13,10 +13,10 @@
  * REF: docs/IMPLEMENTATION_ROADMAP.md §3.2 T1.7
  */
 
-const rateLimit     = require('express-rate-limit');
+const rateLimit = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
-const redisClient   = require('../../config/redis');
-const { AppError }  = require('../errors/AppError');
+const redisClient = require('../../config/redis');
+const { AppError } = require('../errors/AppError');
 const { ERROR_CODES } = require('../errors/errorCodes');
 
 /**
@@ -32,7 +32,7 @@ const createRateLimiter = ({ windowMs, max, prefix }) =>
     windowMs,
     max,
     standardHeaders: true,  // Return rate limit info in RateLimit-* headers
-    legacyHeaders:   false,  // Disable X-RateLimit-* headers
+    legacyHeaders: false,  // Disable X-RateLimit-* headers
     store: new RedisStore({
       // rate-limit-redis v4.x: use sendCommand
       sendCommand: (...args) => redisClient.call(...args),
@@ -52,20 +52,24 @@ const createRateLimiter = ({ windowMs, max, prefix }) =>
       );
     },
     skip: (req) => {
-      // Super admins are exempt from rate limiting
+      // Skip for super admins (already authenticated)
       if (req.user?.role === 'super_admin') return true;
+      // Skip for localhost in development — avoids blocking smoke tests
+      const ip = req.ip || req.connection?.remoteAddress || '';
+      if (process.env.NODE_ENV !== 'production' && (ip === '127.0.0.1' || ip === '::1' || ip.includes('::ffff:127.'))) return true;
       return false;
     },
   });
 
 /**
  * Tier 1: Global rate limit — applied to ALL routes in app.js
- * 100 requests per 15 minutes per IP address
+ * Development: 1000 req / 15 min (smoke testing friendly)
+ * Production:  100  req / 15 min
  */
 const globalRateLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max:      100,
-  prefix:   'rl:global:',
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000,
+  prefix: 'rl:global:',
 });
 
 /**
@@ -74,8 +78,8 @@ const globalRateLimiter = createRateLimiter({
  */
 const authRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max:      10,
-  prefix:   'rl:auth:',
+  max: 10,
+  prefix: 'rl:auth:',
 });
 
 /**
@@ -85,9 +89,9 @@ const authRateLimiter = createRateLimiter({
  */
 const otpResendLimiter = rateLimit({
   windowMs: 60 * 1000, // 60 seconds
-  max:      1,
+  max: 1,
   standardHeaders: true,
-  legacyHeaders:   false,
+  legacyHeaders: false,
   keyGenerator: (req) => req.body?.email || req.ip,
   store: new RedisStore({
     sendCommand: (...args) => redisClient.call(...args),

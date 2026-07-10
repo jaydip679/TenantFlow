@@ -39,7 +39,7 @@ const nameSchema = (field) =>
       'string.pattern.base': `${field} can only contain letters, spaces, hyphens, and apostrophes`,
     });
 
-const emailSchema = Joi.string().email().lowercase().max(255).required();
+const emailSchema = Joi.string().email({ tlds: { allow: false } }).lowercase().max(255).required();
 const otpSchema   = Joi.string().length(6).pattern(/^\d{6}$/).required()
   .messages({ 'string.pattern.base': 'OTP must be a 6-digit number' });
 
