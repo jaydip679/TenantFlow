@@ -256,6 +256,7 @@ export default function TenantsPage() {
   const navigate = useNavigate();
   const [tenants,    setTenants]    = useState([]);
   const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState('');
   const [page,       setPage]       = useState(1);
   const [total,      setTotal]      = useState(0);
   const [statusFilter, setStatus]   = useState('all');
@@ -275,8 +276,12 @@ export default function TenantsPage() {
         const d = res.data?.data ?? res.data;
         setTenants(Array.isArray(d) ? d : (d?.tenants ?? []));
         setTotal(d?.total ?? (Array.isArray(d) ? d.length : 0));
+        setError('');
       })
-      .catch(() => setTenants([]))
+      .catch((err) => {
+        setError(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to load tenants.');
+        setTenants([]);
+      })
       .finally(() => setLoading(false));
   }, [page, statusFilter, riskFilter, search]);
 
@@ -308,6 +313,12 @@ export default function TenantsPage() {
             <p style={S.pageSub}>Manage all platform tenants</p>
           </div>
         </div>
+
+        {error && (
+          <div style={{ marginBottom: 16, padding: '10px 16px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', fontSize: 13 }}>
+            {error}
+          </div>
+        )}
 
         {/* Filters */}
         <div style={S.filtersRow}>

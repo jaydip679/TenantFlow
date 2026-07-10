@@ -266,7 +266,7 @@ const listTenants = async (filters = {}, options = {}) => {
         as:           'subscription',
       },
     },
-    { $unwind: { path: '$subscription', preserveNullAndEmpty: true } },
+    { $unwind: { path: '$subscription', preserveNullAndEmptyArrays: true } },
     // Join plan version
     {
       $lookup: {
@@ -276,7 +276,7 @@ const listTenants = async (filters = {}, options = {}) => {
         as:           'planVersion',
       },
     },
-    { $unwind: { path: '$planVersion', preserveNullAndEmpty: true } },
+    { $unwind: { path: '$planVersion', preserveNullAndEmptyArrays: true } },
     // Join churn score
     {
       $lookup: {
@@ -286,7 +286,7 @@ const listTenants = async (filters = {}, options = {}) => {
         as:           'churnScore',
       },
     },
-    { $unwind: { path: '$churnScore', preserveNullAndEmpty: true } },
+    { $unwind: { path: '$churnScore', preserveNullAndEmptyArrays: true } },
     // Filter by riskLevel if provided
     ...(filters.riskLevel ? [{ $match: { 'churnScore.riskLevel': filters.riskLevel } }] : []),
     // Filter by planVersionId if provided

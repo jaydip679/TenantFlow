@@ -43,7 +43,12 @@ export default function DunningPage() {
     setLoading(true);
     try {
       const res = await getActiveDunning();
-      setRecords(res.data.data?.dunningRecords || res.data.data || []);
+      const raw = res.data.data;
+      // Safely extract array — raw could be { dunningRecords: [] } or [] or {}
+      const list = Array.isArray(raw?.dunningRecords)
+        ? raw.dunningRecords
+        : Array.isArray(raw) ? raw : [];
+      setRecords(list);
     } catch {
       setError('Failed to load dunning records.');
     } finally {

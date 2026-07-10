@@ -23,11 +23,17 @@ export default function ChurnRiskPage() {
   useEffect(() => {
     getAllChurnScores()
       .then((res) => {
-        const list = res.data.data?.churnScores || res.data.data || [];
-        // Sort by score descending
+        const raw  = res.data.data;
+        const list = Array.isArray(raw?.churnScores)
+          ? raw.churnScores
+          : Array.isArray(raw) ? raw : [];
         setScores([...list].sort((a, b) => b.churnRiskScore - a.churnRiskScore));
       })
-      .catch(() => setError('Failed to load churn scores.'))
+      .catch((err) => {
+        // 404 = no scores yet (AI cron hasn't run) — show empty state, not error
+        if (err.response?.status === 404) return;
+        setError('Failed to load churn scores.');
+      })
       .finally(() => setLoading(false));
   }, []);
 
