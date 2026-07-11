@@ -365,8 +365,10 @@ export default function DashboardPage() {
   const trialEnd   = subscription?.trialEnd;
   const daysLeft   = trialEnd ? daysUntil(trialEnd) : 0;
 
-  const usedSeats  = subscription?.usedSeats ?? 0;
-  const totalSeats = subscription?.totalSeats ?? subscription?.plan?.seats ?? 0;
+  const usedSeats  = subscription?.seatCount ?? 0;
+  const totalSeats = subscription?.planVersionId?.features?.max_seats
+                  ?? subscription?.planId?.features?.max_seats
+                  ?? 0;
 
   const nextBilling = subscription?.currentPeriodEnd;
   const lastInvoice = Array.isArray(invoices) ? invoices[0] : null;
@@ -440,8 +442,8 @@ export default function DashboardPage() {
         <MetricCard
           icon={Zap}
           label="Subscription Status"
-          value={subscription?.plan?.name ?? '—'}
-          sub={`Billed ${subscription?.interval ?? ''}`}
+          value={(subscription?.planVersionId?.displayName || subscription?.planId?.displayName) ?? '—'}
+          sub={`Billed ${subscription?.planVersionId?.interval || subscription?.planId?.interval || 'monthly'}`}
           accentColor={ACCENT}
           badge={statusBadge()}
         />
