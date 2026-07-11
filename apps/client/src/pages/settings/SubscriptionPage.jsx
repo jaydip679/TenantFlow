@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { CreditCard, Zap, Check, X, AlertTriangle } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout.jsx';
-import { getSubscription, getPlans, cancelSubscription, changePlan } from '../../services/subscriptionService.js';
+import { getSubscription, getPlans, cancelSubscription, subscribePlan, upgradePlan, downgradePlan } from '../../services/subscriptionService.js';
 import api from '../../services/api.js';
 import { formatCurrency, formatDate } from '../../utils/helpers.js';
 
@@ -30,7 +30,9 @@ export default function SubscriptionPage() {
       getPlans(),
     ])
       .then(([subRes, planRes]) => {
-        setSub(subRes?.data?.data ?? null);
+        // API returns { data: { subscription: {...} } } — unwrap the inner object
+        const rawSub = subRes?.data?.data;
+        setSub(rawSub?.subscription ?? rawSub ?? null);
         setPlans(planRes.data.data?.planVersions || planRes.data.data?.plans || []);
       })
       .catch(() => setError('Failed to load subscription data.'))
@@ -45,7 +47,7 @@ export default function SubscriptionPage() {
   const openChangePlan = async (plan) => {
     setModal({ type: 'change', plan });
     try {
-      const res = await api.post(`/subscriptions/${tenantId}/preview-change`, { planVersionId: plan._id });
+      const res = await api.post(`/subscriptions/${tenantId}/preview-change`, { targetPlanId: plan._id });
       setPreview(res.data.data);
     } catch {
       setPreview(null);
@@ -56,13 +58,26 @@ export default function SubscriptionPage() {
     if (!modal?.plan) return;
     setActionLoading(true);
     try {
-      await changePlan(tenantId, { planVersionId: modal.plan._id });
+      if (!sub) {
+        // First-time: no subscription exists yet
+        await subscribePlan(tenantId, { planId: modal.plan._id });
+      } else {
+        // Compare against the price locked in the current plan version snapshot
+        const currentPrice = sub?.planVersionId?.price || sub?.planId?.price || 0;
+        const isUpgrade = modal.plan.price > currentPrice;
+        if (isUpgrade) {
+          await upgradePlan(tenantId, { targetPlanId: modal.plan._id });
+        } else {
+          await downgradePlan(tenantId, { targetPlanId: modal.plan._id });
+        }
+      }
       showToast('Plan changed successfully!');
       setModal(null);
       const res = await getSubscription(tenantId);
-      setSub(res.data.data);
+      const rawSub = res.data.data;
+      setSub(rawSub?.subscription ?? rawSub ?? null);
     } catch (err) {
-      setError(err.response?.data?.message || 'Plan change failed.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Plan change failed.');
     } finally {
       setActionLoading(false);
     }
@@ -71,13 +86,15 @@ export default function SubscriptionPage() {
   const confirmCancel = async () => {
     setActionLoading(true);
     try {
-      await cancelSubscription(tenantId);
+      // Backend requires { cancelAtPeriodEnd: true } — access ends at period end, not immediately
+      await cancelSubscription(tenantId, { cancelAtPeriodEnd: true });
       showToast('Subscription cancelled. You retain access until the billing period ends.');
       setModal(null);
       const res = await getSubscription(tenantId);
-      setSub(res.data.data);
+      const rawSub = res.data.data;
+      setSub(rawSub?.subscription ?? rawSub ?? null);
     } catch (err) {
-      setError(err.response?.data?.message || 'Cancellation failed.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Cancellation failed.');
     } finally {
       setActionLoading(false);
     }
@@ -85,7 +102,8 @@ export default function SubscriptionPage() {
 
   if (loading) return <DashboardLayout><div style={{ padding: 80, textAlign: 'center' }}><div className="btn-spinner" style={{ width: 36, height: 36, borderWidth: 3, margin: '0 auto', borderTopColor: 'var(--color-primary)' }} /></div></DashboardLayout>;
 
-  const currentPlanId = sub?.planVersion?._id;
+  // sub.planId is the populated Plan object — compare its _id against plan cards
+  const currentPlanId = sub?.planId?._id?.toString() || sub?.planId?.toString();
 
   return (
     <DashboardLayout>
@@ -120,12 +138,12 @@ export default function SubscriptionPage() {
             <div className="card-header">
               <div>
                 <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>
-                  {sub.planVersion?.plan?.name || 'Current Plan'}
-                  {' '}<span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 400 }}>({sub.planVersion?.interval || 'monthly'})</span>
+                  {sub.planVersionId?.displayName || sub.planId?.displayName || 'Current Plan'}
+                  {' '}<span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 400 }}>({sub.planVersionId?.interval || sub.planId?.interval || 'monthly'})</span>
                 </h2>
                 <p style={{ color: 'var(--color-text-muted)', fontSize: 13, marginTop: 4 }}>
-                  Next billing: <strong>{formatDate(sub.currentPeriodEnd)}</strong>
-                  {' · '}Amount: <strong>{formatCurrency(sub.planVersion?.price)}</strong>
+                   Next billing: <strong>{formatDate(sub.currentPeriodEnd)}</strong>
+                   {' · '}Amount: <strong>{formatCurrency(sub.planVersionId?.price || sub.planId?.price)}</strong>
                 </p>
               </div>
               {sub.status !== 'cancelled' && (
@@ -135,11 +153,14 @@ export default function SubscriptionPage() {
               )}
             </div>
             {/* Features */}
-            {sub.planVersion?.features && (
+            {(sub.planVersionId?.features || sub.planId?.features) && (
               <div>
                 <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Included Features</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {Object.entries(sub.planVersion.features).map(([k, v]) => (
+                  {Object.entries(sub.planVersionId?.features instanceof Map
+                    ? Object.fromEntries(sub.planVersionId.features)
+                    : (sub.planVersionId?.features || sub.planId?.features || {})
+                  ).map(([k, v]) => (
                     <span key={k} className="signal-tag">
                       {v === true ? <Check size={10} style={{ marginRight: 4 }} /> : null}
                       {k.replace(/_/g, ' ')}
@@ -161,19 +182,22 @@ export default function SubscriptionPage() {
             </h2>
             <div className="plan-cards">
               {plans.map((plan) => {
-                const isCurrent = plan._id === currentPlanId;
-                const isUpgrade = plan.price > (sub?.planVersion?.price || 0);
+                const isCurrent = plan._id?.toString() === currentPlanId;
+                const currentPrice = sub?.planVersionId?.price || sub?.planId?.price || 0;
+                const isUpgrade = plan.price > currentPrice;
+                const isGrowth  = plan.name === 'growth' || plan.displayName === 'Growth';
+                const btnLabel  = !sub ? 'Subscribe →' : isCurrent ? null : isUpgrade ? 'Upgrade →' : 'Downgrade';
                 return (
-                  <div key={plan._id} className={`plan-card${isCurrent ? ' current' : ''}${plan.plan?.name === 'Growth' ? ' featured' : ''}`}>
+                  <div key={plan._id} className={`plan-card${isCurrent ? ' current' : ''}${isGrowth ? ' featured' : ''}`}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                      {plan.plan?.name || plan.name}
+                      {plan.displayName || plan.plan?.name || plan.name}
                     </p>
                     <div className="plan-price">
                       {formatCurrency(plan.price)}
                       <span>/{plan.interval === 'annual' ? 'yr' : 'mo'}</span>
                     </div>
                     <ul className="plan-features">
-                      <li>Up to {plan.features?.seat_limit || '∞'} seats</li>
+                      <li>Up to {plan.features?.max_seats || '∞'} seats</li>
                       {plan.features?.ai_assistant && <li>AI Billing Assistant</li>}
                       {plan.features?.advanced_analytics && <li>Advanced Analytics</li>}
                       {plan.features?.priority_support && <li>Priority Support</li>}
@@ -183,10 +207,10 @@ export default function SubscriptionPage() {
                       <button className="btn-secondary btn-full" disabled>✓ Current Plan</button>
                     ) : (
                       <button
-                        className={isUpgrade ? 'btn-primary btn-full' : 'btn-secondary btn-full'}
+                        className={(!sub || isUpgrade) ? 'btn-primary btn-full' : 'btn-secondary btn-full'}
                         onClick={() => openChangePlan(plan)}
                       >
-                        {isUpgrade ? 'Upgrade →' : 'Downgrade'}
+                        {btnLabel}
                       </button>
                     )}
                   </div>

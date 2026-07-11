@@ -61,7 +61,14 @@ const getLatestPlanVersion = async (planId, plan) => {
     price:       plan.price,
     currency:    plan.currency,
     interval:    plan.interval,
-    features:    plan.features,
+    features: new Map(Object.entries({
+      max_seats:           plan.features.max_seats,
+      api_calls_per_month: plan.features.api_calls_per_month,
+      storage_gb:          plan.features.storage_gb,
+      advanced_analytics:  plan.features.advanced_analytics,
+      ai_assistant:        plan.features.ai_assistant,
+      priority_support:    plan.features.priority_support,
+    })),
     snapshotAt:  new Date(),
   });
 };
@@ -81,7 +88,14 @@ const createPlanVersionSnapshot = async (plan) => {
     price:       plan.price,
     currency:    plan.currency,
     interval:    plan.interval,
-    features:    plan.features,
+    features: new Map(Object.entries({
+      max_seats:           plan.features.max_seats,
+      api_calls_per_month: plan.features.api_calls_per_month,
+      storage_gb:          plan.features.storage_gb,
+      advanced_analytics:  plan.features.advanced_analytics,
+      ai_assistant:        plan.features.ai_assistant,
+      priority_support:    plan.features.priority_support,
+    })),
     snapshotAt:  new Date(),
   });
 };
@@ -285,7 +299,15 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
         price:       targetPlan.price,
         currency:    targetPlan.currency,
         interval:    targetPlan.interval,
-        features:    targetPlan.features,
+        // Convert Mongoose subdocument to a plain Map (PlanVersion.features is Map type)
+        features: new Map(Object.entries({
+          max_seats:           targetPlan.features.max_seats,
+          api_calls_per_month: targetPlan.features.api_calls_per_month,
+          storage_gb:          targetPlan.features.storage_gb,
+          advanced_analytics:  targetPlan.features.advanced_analytics,
+          ai_assistant:        targetPlan.features.ai_assistant,
+          priority_support:    targetPlan.features.priority_support,
+        })),
         snapshotAt:  new Date(),
       }], { session });
       const newPlanVersion = newVersion[0];

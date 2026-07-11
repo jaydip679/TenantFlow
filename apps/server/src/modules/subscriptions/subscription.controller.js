@@ -103,6 +103,18 @@ const getSubscriptionEvents = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: { events, pagination } });
 });
 
+/**
+ * POST /:tenantId/subscribe — First-time plan selection (no existing subscription)
+ */
+const subscribeToplan = asyncHandler(async (req, res) => {
+  const subscription = await subscriptionService.createSubscription(
+    req.params.tenantId,
+    req.body.planId,
+    { seatCount: 1, actorUser: req.user }
+  );
+  res.status(201).json({ success: true, data: { subscription } });
+});
+
 module.exports = {
   getSubscription,
   upgradeSubscription,
@@ -113,4 +125,5 @@ module.exports = {
   pauseSubscription,
   resumeSubscription,
   getSubscriptionEvents,
+  subscribeToplan,
 };

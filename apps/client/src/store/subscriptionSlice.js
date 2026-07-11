@@ -12,7 +12,10 @@ export const fetchSubscription = createAsyncThunk(
   async (tenantId, { rejectWithValue }) => {
     try {
       const res = await getSubscription(tenantId);
-      return res.data.data;
+      // API returns { data: { subscription: {...} } } — unwrap the inner object
+      // so Redux state.subscription.subscription = actual sub doc (not a wrapper)
+      const raw = res.data.data;
+      return raw?.subscription ?? raw ?? null;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to load subscription');
     }

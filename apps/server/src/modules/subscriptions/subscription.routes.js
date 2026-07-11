@@ -292,4 +292,16 @@ router.get(
   subscriptionController.getSubscriptionEvents
 );
 
+/**
+ * POST /:tenantId/subscribe — First-time plan selection
+ * Called when a user has no existing subscription and picks a plan.
+ */
+router.post(
+  '/:tenantId/subscribe',
+  authenticate,
+  tenantScope({ allowSuspended: true }),
+  authorize('tenant_admin', 'super_admin'),
+  subscriptionController.subscribeToplan
+);
+
 module.exports = router;

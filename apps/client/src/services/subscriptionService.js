@@ -3,8 +3,12 @@ import api from './api.js';
 // ── Subscriptions ─────────────────────────────────────────────────────────────
 export const getSubscription        = (tenantId)           => api.get(`/subscriptions/${tenantId}`);
 export const previewPlanChange      = (tenantId, payload)  => api.post(`/subscriptions/${tenantId}/preview-change`, payload);
-export const changePlan             = (tenantId, payload)  => api.post(`/subscriptions/${tenantId}/change-plan`, payload);
-export const cancelSubscription     = (tenantId)           => api.post(`/subscriptions/${tenantId}/cancel`);
+export const subscribePlan          = (tenantId, payload)  => api.post(`/subscriptions/${tenantId}/subscribe`, payload);
+export const upgradePlan            = (tenantId, payload)  => api.post(`/subscriptions/${tenantId}/upgrade`, payload);
+export const downgradePlan          = (tenantId, payload)  => api.post(`/subscriptions/${tenantId}/downgrade`, payload);
+// Kept for backward compat — routes to upgrade or downgrade based on payload
+export const changePlan             = (tenantId, payload)  => api.post(`/subscriptions/${tenantId}/upgrade`, payload);
+export const cancelSubscription     = (tenantId, body)     => api.post(`/subscriptions/${tenantId}/cancel`, body);
 export const reactivateSubscription = (tenantId)           => api.post(`/subscriptions/${tenantId}/reactivate`);
 
 // ── Plans ─────────────────────────────────────────────────────────────────────
