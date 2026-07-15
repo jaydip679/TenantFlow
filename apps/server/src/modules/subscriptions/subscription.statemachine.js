@@ -24,7 +24,7 @@ const { AppError }     = require('../../shared/errors/AppError');
 const { ERROR_CODES }  = require('../../shared/errors/errorCodes');
 
 const ALLOWED_TRANSITIONS = {
-  trialing:          ['active', 'cancelled'],
+  trialing:          ['active', 'cancelled', 'pending_downgrade'],  // can schedule downgrade during trial
   active:            ['past_due', 'cancelled', 'paused', 'pending_downgrade'],
   pending_downgrade: ['active', 'past_due', 'cancelled'],
   past_due:          ['active', 'suspended', 'cancelled'],

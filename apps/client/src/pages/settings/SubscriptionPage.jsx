@@ -146,7 +146,30 @@ export default function SubscriptionPage() {
                    {' · '}Amount: <strong>{formatCurrency(sub.planVersionId?.price || sub.planId?.price)}</strong>
                 </p>
               </div>
-              {sub.status !== 'cancelled' && (
+              {/* Smart cancel / status area */}
+              {sub.status === 'cancelled' ? (
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#f87171', background: 'rgba(248,113,113,0.12)', borderRadius: 8, padding: '4px 12px' }}>
+                  Cancelled
+                </span>
+              ) : sub.cancelAtPeriodEnd ? (
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: 12, color: '#fbbf24', margin: '0 0 4px', fontWeight: 600 }}>
+                    ⚠ Cancels on {formatDate(sub.currentPeriodEnd)}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0 }}>
+                    Access continues until that date.
+                  </p>
+                </div>
+              ) : sub.status === 'pending_downgrade' ? (
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: 12, color: '#a78bfa', margin: '0 0 4px', fontWeight: 600 }}>
+                    ↓ Downgrade scheduled for {formatDate(sub.currentPeriodEnd)}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0 }}>
+                    Current plan remains active until then.
+                  </p>
+                </div>
+              ) : (
                 <button className="btn-danger btn-sm" onClick={() => setModal('cancel')}>
                   <X size={14} /> Cancel Subscription
                 </button>
