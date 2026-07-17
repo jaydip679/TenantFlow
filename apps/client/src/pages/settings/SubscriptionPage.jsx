@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { CreditCard, Zap, Check, X, AlertTriangle } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout.jsx';
-import { getSubscription, getPlans, cancelSubscription, subscribePlan, upgradePlan, downgradePlan } from '../../services/subscriptionService.js';
+import { getSubscription, getPlans, cancelSubscription, reactivateSubscription, subscribePlan, upgradePlan, downgradePlan } from '../../services/subscriptionService.js';
 import api from '../../services/api.js';
 import { formatCurrency, formatDate } from '../../utils/helpers.js';
 
@@ -100,6 +100,22 @@ export default function SubscriptionPage() {
     }
   };
 
+  const confirmReactivate = async () => {
+    setActionLoading(true);
+    setError('');
+    try {
+      await reactivateSubscription(tenantId);
+      showToast('✅ Plan reactivated! Your subscription is now active.');
+      const res = await getSubscription(tenantId);
+      const rawSub = res.data.data;
+      setSub(rawSub?.subscription ?? rawSub ?? null);
+    } catch (err) {
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Reactivation failed.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) return <DashboardLayout><div style={{ padding: 80, textAlign: 'center' }}><div className="btn-spinner" style={{ width: 36, height: 36, borderWidth: 3, margin: '0 auto', borderTopColor: 'var(--color-primary)' }} /></div></DashboardLayout>;
 
   // sub.planId is the populated Plan object — compare its _id against plan cards
@@ -148,17 +164,34 @@ export default function SubscriptionPage() {
               </div>
               {/* Smart cancel / status area */}
               {sub.status === 'cancelled' ? (
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#f87171', background: 'rgba(248,113,113,0.12)', borderRadius: 8, padding: '4px 12px' }}>
-                  Cancelled
-                </span>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#f87171', marginBottom: 8 }}>
+                    ✕ Subscription Cancelled
+                  </span>
+                  <button
+                    className="btn-primary btn-sm"
+                    onClick={confirmReactivate}
+                    disabled={actionLoading}
+                  >
+                    {actionLoading ? <span className="btn-spinner" /> : '↺ Reactivate Plan'}
+                  </button>
+                </div>
               ) : sub.cancelAtPeriodEnd ? (
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 12, color: '#fbbf24', margin: '0 0 4px', fontWeight: 600 }}>
+                  <p style={{ fontSize: 12, color: '#fbbf24', margin: '0 0 8px', fontWeight: 600 }}>
                     ⚠ Cancels on {formatDate(sub.currentPeriodEnd)}
                   </p>
-                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0 }}>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 10px' }}>
                     Access continues until that date.
                   </p>
+                  <button
+                    className="btn-secondary btn-sm"
+                    onClick={confirmReactivate}
+                    disabled={actionLoading}
+                    style={{ fontSize: 12 }}
+                  >
+                    {actionLoading ? <span className="btn-spinner" /> : '↺ Keep Plan'}
+                  </button>
                 </div>
               ) : sub.status === 'pending_downgrade' ? (
                 <div style={{ textAlign: 'right' }}>
