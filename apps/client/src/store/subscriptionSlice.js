@@ -4,6 +4,7 @@ import {
   getTenantInvoices,
   getPlans,
 } from '../services/subscriptionService.js';
+import { logout } from './authSlice.js';
 
 // ── Thunks ────────────────────────────────────────────────────────────────────
 
@@ -17,6 +18,8 @@ export const fetchSubscription = createAsyncThunk(
       const raw = res.data.data;
       return raw?.subscription ?? raw ?? null;
     } catch (err) {
+      // 404 = new user with no subscription yet — not a real error, just return null
+      if (err.response?.status === 404) return null;
       return rejectWithValue(err.response?.data?.message || 'Failed to load subscription');
     }
   }
@@ -46,20 +49,24 @@ export const fetchPlans = createAsyncThunk(
   }
 );
 
+// ── Initial State ─────────────────────────────────────────────────────────────
+
+const initialState = {
+  subscription: null,
+  invoices: [],
+  invoicePagination: {},
+  plans: [],
+  loading: false,
+  invoicesLoading: false,
+  plansLoading: false,
+  error: null,
+};
+
 // ── Slice ─────────────────────────────────────────────────────────────────────
 
 const subscriptionSlice = createSlice({
   name: 'subscription',
-  initialState: {
-    subscription: null,
-    invoices: [],
-    invoicePagination: {},
-    plans: [],
-    loading: false,
-    invoicesLoading: false,
-    plansLoading: false,
-    error: null,
-  },
+  initialState,
   reducers: {
     clearSubscriptionError(state) {
       state.error = null;
@@ -67,8 +74,15 @@ const subscriptionSlice = createSlice({
     setSubscription(state, action) {
       state.subscription = action.payload;
     },
+    // Manually reset — useful after registration or account switch
+    resetSubscription: () => initialState,
   },
   extraReducers: (builder) => {
+    // ── CRITICAL: Reset all subscription state when user logs out ─────────────
+    // Without this, the previous user's plan (e.g. Growth 20/20) would persist
+    // in memory and appear for the next user who logs in.
+    builder.addCase(logout, () => initialState);
+
     // fetchSubscription
     builder
       .addCase(fetchSubscription.pending, (state) => {
@@ -77,11 +91,14 @@ const subscriptionSlice = createSlice({
       })
       .addCase(fetchSubscription.fulfilled, (state, action) => {
         state.loading = false;
-        state.subscription = action.payload;
+        // payload is null when new user has no subscription (404 → resolved to null above)
+        state.subscription = action.payload ?? null;
       })
       .addCase(fetchSubscription.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        // Clear stale subscription so previous user's plan doesn't bleed through
+        state.subscription = null;
       });
 
     // fetchTenantInvoices
@@ -113,5 +130,5 @@ const subscriptionSlice = createSlice({
   },
 });
 
-export const { clearSubscriptionError, setSubscription } = subscriptionSlice.actions;
+export const { clearSubscriptionError, setSubscription, resetSubscription } = subscriptionSlice.actions;
 export default subscriptionSlice.reducer;

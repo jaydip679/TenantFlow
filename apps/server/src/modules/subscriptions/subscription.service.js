@@ -170,6 +170,20 @@ const createSubscription = async (tenantId, planId, options = {}) => {
     });
   }
 
+  // Update Tenant.currentPlanId + features so tenantScope middleware
+  // can read the correct seatLimit from tenant.features.max_seats
+  await Tenant.findByIdAndUpdate(tenantId, {
+    currentPlanId: plan._id,
+    features: new Map(Object.entries({
+      max_seats:           plan.features.max_seats,
+      api_calls_per_month: plan.features.api_calls_per_month,
+      storage_gb:          plan.features.storage_gb,
+      advanced_analytics:  plan.features.advanced_analytics,
+      ai_assistant:        plan.features.ai_assistant,
+      priority_support:    plan.features.priority_support,
+    })),
+  });
+
   await invalidateTenantCache(tenantId.toString());
 
   return subscription;
@@ -381,7 +395,12 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
       const fromPlanId = subscription.planId;
       subscription.planId        = targetPlan._id;
       subscription.planVersionId = newPlanVersion._id;
-      subscription.seatCount     = Math.max(subscription.seatCount, targetPlan.features.max_seats);
+      // seatCount = actual active/invited users in this tenant (not the plan max capacity).
+      // Recount here so the value is always accurate after an upgrade.
+      subscription.seatCount = await User.countDocuments({
+        tenantId,
+        status: { $in: ['active', 'invited'] },
+      });
       await subscription.save({ session });
 
       // 10. Update Tenant.currentPlanId + features

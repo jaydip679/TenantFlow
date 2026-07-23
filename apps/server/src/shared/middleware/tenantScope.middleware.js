@@ -112,7 +112,9 @@ const tenantScope = (options = {}) =>
         status:             tenant.status,
         planId:             subscription?.planId?.toString()   || null,
         subscriptionStatus: subscription?.status               || null,
-        seatLimit:          subscription?.seatCount            || (featuresObj?.max_seats ?? 0),
+        // seatLimit = the plan's max allowed seats (from tenant.features, set when plan is assigned/upgraded)
+        // seatCount on the subscription = USED seats — must NOT be used as the limit
+        seatLimit:          featuresObj?.max_seats ?? 0,
         usedSeats,
         features:           featuresObj,
       };

@@ -196,27 +196,53 @@ const inviteMember = async (tenantId, email, role, actorUser, tenantContext) => 
     );
   }
 
-  // Check if email already a member of this tenant
-  const existing = await User.findOne({ tenantId, email: normalizedEmail });
-  if (existing) {
-    throw new AppError('This email address is already a member of this tenant.', 409, ERROR_CODES.USER_ALREADY_MEMBER);
+  // Check if email already a member of THIS tenant
+  const existingInTenant = await User.findOne({ tenantId, email: normalizedEmail });
+  if (existingInTenant) {
+    throw new AppError('This email is already a member of this workspace.', 409, ERROR_CODES.USER_ALREADY_MEMBER);
+  }
+
+  // Check if email is already registered on TenantFlow (any tenant).
+  // Because email is globally unique, we cannot create a second User record for this email.
+  // The person would need to use a different email address for this workspace.
+  const existingGlobal = await User.findOne({ email: normalizedEmail });
+  if (existingGlobal) {
+    throw new AppError(
+      'This email is already registered on TenantFlow with another account. ' +
+      'They must use a different email address to join this workspace, or contact support for cross-workspace access.',
+      409,
+      ERROR_CODES.USER_ALREADY_MEMBER
+    );
   }
 
   const inviteToken = uuidv4();
 
-  const invitedUser = await User.create({
-    tenantId,
-    email:           normalizedEmail,
-    passwordHash:    'INVITE_PENDING', // placeholder — set on acceptInvite
-    firstName:       '',
-    lastName:        '',
-    role,
-    status:          'invited',
-    isEmailVerified: false,
-    invitedBy:       actorUser.id,
-    inviteToken,
-    inviteExpiresAt: addHours(new Date(), INVITE_EXPIRY_H),
-  });
+  let invitedUser;
+  try {
+    invitedUser = await User.create({
+      tenantId,
+      email:           normalizedEmail,
+      passwordHash:    'INVITE_PENDING', // placeholder — set on acceptInvite
+      firstName:       'Invited',        // placeholder — overwritten on acceptInvite
+      lastName:        'User',           // placeholder — overwritten on acceptInvite
+      role,
+      status:          'invited',
+      isEmailVerified: false,
+      invitedBy:       actorUser.id,
+      inviteToken,
+      inviteExpiresAt: addHours(new Date(), INVITE_EXPIRY_H),
+    });
+  } catch (err) {
+    // E11000 = MongoDB duplicate key — email already registered (race condition or missed pre-check)
+    if (err.code === 11000) {
+      throw new AppError(
+        'This email is already registered on TenantFlow. They must use a different email address for this workspace.',
+        409,
+        ERROR_CODES.USER_ALREADY_MEMBER
+      );
+    }
+    throw err;
+  }
 
   // Fetch inviter name for email
   const inviter = await User.findById(actorUser.id).select('firstName lastName').lean();
