@@ -206,12 +206,13 @@ const verifyEmail = async (email, otp, meta = {}) => {
 
   const { accessToken, refreshTokenRaw } = await issueTokenPair(user, meta);
 
-  // Enqueue welcome email
+  // Enqueue welcome email — look up the tenant name so we don't expose the raw ObjectId
+  const tenant = await Tenant.findById(user.tenantId).lean();
   await enqueueEmail({
     type:       'welcome',
     to:         normalizedEmail,
     firstName:  user.firstName,
-    tenantName: user.tenantId?.toString() || 'your organization',
+    tenantName: tenant?.name || tenant?.companyName || 'your organization',
   });
 
   return {
