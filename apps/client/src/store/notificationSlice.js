@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { logout } from './authSlice.js';
 
 const initialState = {
   notifications: [],
@@ -37,6 +38,10 @@ const notificationSlice = createSlice({
     setLoading(state, action) {
       state.isLoading = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    // Clear notifications on logout to prevent data bleed between users
+    builder.addCase(logout, () => initialState);
   },
 });
 

@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { logout } from './authSlice.js';
 
 const initialState = {
   metrics: null,
@@ -19,6 +20,10 @@ const adminSlice = createSlice({
     setDunningRecords(state, action){ state.dunningRecords = action.payload; },
     setChurnScores(state, action)   { state.churnScores    = action.payload; },
     setAdminLoading(state, action)  { state.isLoading      = action.payload; },
+  },
+  extraReducers: (builder) => {
+    // Clear all admin data on logout to prevent data bleed between users/roles
+    builder.addCase(logout, () => initialState);
   },
 });
 
