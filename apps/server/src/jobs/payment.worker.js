@@ -138,11 +138,23 @@ const processPaymentJob = async (job) => {
       }
     }
 
-    // ── 7. Phase 7 stub: Socket.IO ────────────────────────────
-    logger.info(
-      { tenantId: transaction.tenantId, event: 'payment:success' },
-      '[Phase 7 stub] Socket.IO emit: payment:success'
-    );
+    // ── 7. Emit Socket.IO: payment:success ───────────────────
+    try {
+      const app = require('../app');
+      const io  = app.get('io');
+      if (io) {
+        const { emitToAdmins } = require('../sockets/admin.namespace');
+        emitToAdmins(io, 'admin:payment:success', {
+          tenantId:      transaction.tenantId,
+          invoiceId:     transaction.invoiceId,
+          amountPaid:    invoice?.amountPaid || transaction.amount,
+          paidAt:        transaction.capturedAt,
+          razorpayPaymentId,
+        });
+      }
+    } catch (err) {
+      logger.warn({ err: err.message }, 'Socket.IO payment:success emit failed (non-critical)');
+    }
 
   } else if (event === 'payment.failed') {
     // ── payment.failed flow ───────────────────────────────────
@@ -183,11 +195,21 @@ const processPaymentJob = async (job) => {
       logger.warn({ err: err.message }, 'Payment failed email enqueue failed');
     }
 
-    // Phase 7 stub: Socket.IO
-    logger.info(
-      { tenantId: transaction.tenantId, event: 'payment:failed' },
-      '[Phase 7 stub] Socket.IO emit: payment:failed'
-    );
+    // ── Emit Socket.IO: payment:failed ──────────────────────
+    try {
+      const app = require('../app');
+      const io  = app.get('io');
+      if (io) {
+        const { emitToAdmins } = require('../sockets/admin.namespace');
+        emitToAdmins(io, 'admin:payment:failed', {
+          tenantId:         transaction.tenantId,
+          invoiceId:        transaction.invoiceId,
+          errorDescription: transaction.errorDescription,
+        });
+      }
+    } catch (err) {
+      logger.warn({ err: err.message }, 'Socket.IO payment:failed emit failed (non-critical)');
+    }
   }
 
   // ── Update WebhookLog if from webhook source ──────────────────

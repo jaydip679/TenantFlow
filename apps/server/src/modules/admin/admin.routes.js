@@ -125,4 +125,11 @@ router.get('/metrics/cash-flow', ...adminAuth, adminController.getCashFlowForeca
  */
 router.get('/metrics/cohort-retention', ...adminAuth, adminController.getCohortRetention);
 
+/**
+ * GET  /metrics/forecast         — Latest revenue forecast + AI narrative
+ * POST /metrics/forecast/trigger — Enqueue a fresh forecast computation job
+ */
+router.get( '/metrics/forecast',         ...adminAuth, adminController.getForecast);
+router.post('/metrics/forecast/trigger', ...adminAuth, adminController.triggerForecast);
+
 module.exports = router;

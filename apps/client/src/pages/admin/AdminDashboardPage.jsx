@@ -205,10 +205,37 @@ export default function AdminDashboardPage() {
     socketRef.current = socket;
 
     const addEvent = (type, data) => {
-      setEvents((prev) => [{ type, data, ts: new Date().toISOString(), id: Math.random() }, ...prev].slice(0, 10));
+      setEvents((prev) => [{ type, data, ts: new Date().toISOString(), id: Math.random() }, ...prev].slice(0, 15));
     };
+
+    // Payment events
+    socket.on('admin:payment:success', (data) => {
+      addEvent('payment:success', data);
+      // Bump MRR counter live — amountPaid is in paise
+      if (data?.amountPaid) {
+        setMetrics(prev => prev ? { ...prev, mrr: (prev.mrr || 0) + data.amountPaid } : prev);
+      }
+    });
+    socket.on('admin:payment:failed',  (data) => addEvent('payment:failed', data));
+
+    // Legacy event names (Phase 7 stubs that may still be emitted during transition)
     socket.on('payment:success', (data) => addEvent('payment:success', data));
     socket.on('payment:failed',  (data) => addEvent('payment:failed',  data));
+
+    // Subscription lifecycle events
+    socket.on('admin:subscription:created',   (data) => {
+      addEvent('subscription:created', data);
+      setMetrics(prev => prev ? { ...prev, activeSubscriptions: (prev.activeSubscriptions || 0) + 1 } : prev);
+    });
+    socket.on('admin:subscription:upgraded',  (data) => addEvent('subscription:upgraded',  data));
+    socket.on('admin:subscription:downgraded',(data) => addEvent('subscription:downgraded', data));
+
+    // Forecast updated — silently refresh metrics
+    socket.on('admin:forecast:updated', () => {
+      getAdminMetrics()
+        .then(res => setMetrics(res.data?.data ?? res.data))
+        .catch(() => {});
+    });
 
     return () => socket.disconnect();
   }, [accessToken]);
@@ -291,32 +318,42 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Live payment event feed */}
+        {/* Live events feed */}
         <div style={S.livePanel}>
           <div style={S.liveTitleRow}>
             <div style={S.liveDot} />
-            <p style={S.liveTitle}>Live Payment Events</p>
+            <p style={S.liveTitle}>Live Platform Events</p>
             <Zap size={14} color="#f59e0b" style={{ marginLeft: 2 }} />
           </div>
 
           <div style={S.eventList}>
             {events.length === 0 ? (
-              <p style={S.emptyEvent}>Waiting for events… (connect to /admin socket)</p>
+              <p style={S.emptyEvent}>Waiting for events… (connected to /admin socket)</p>
             ) : (
               events.map((ev) => {
-                const success = ev.type === 'payment:success';
+                const cfg = {
+                  'payment:success':      { icon: CheckCircle, color: '#4ade80', label: 'Payment Success' },
+                  'payment:failed':       { icon: XCircle,     color: '#f87171', label: 'Payment Failed' },
+                  'subscription:created':  { icon: Zap,         color: '#60a5fa', label: 'New Subscription' },
+                  'subscription:upgraded': { icon: TrendingUp,  color: '#c084fc', label: 'Plan Upgraded' },
+                  'subscription:downgraded':{ icon: Activity,   color: '#fb923c', label: 'Downgrade Scheduled' },
+                }[ev.type] || { icon: Activity, color: '#8b8bad', label: ev.type };
+
+                const Icon    = cfg.icon;
+                const success = ev.type === 'payment:success' || ev.type === 'subscription:created' || ev.type === 'subscription:upgraded';
+
+                const descParts = [];
+                if (ev.data?.tenantName)  descParts.push(ev.data.tenantName);
+                if (ev.data?.planName)    descParts.push(ev.data.planName);
+                if (ev.data?.toPlanName)  descParts.push(`→ ${ev.data.toPlanName}`);
+                if (ev.data?.amountPaid)  descParts.push(formatINR(ev.data.amountPaid));
+
                 return (
-                  <div key={ev.id} style={S.eventItem(success)}>
-                    {success
-                      ? <CheckCircle size={16} color="#4ade80" style={{ flexShrink: 0, marginTop: 1 }} />
-                      : <XCircle    size={16} color="#f87171" style={{ flexShrink: 0, marginTop: 1 }} />
-                    }
+                  <div key={ev.id} style={{ ...S.eventItem(success), borderColor: `${cfg.color}25`, background: `${cfg.color}08` }}>
+                    <Icon size={16} color={cfg.color} style={{ flexShrink: 0, marginTop: 1 }} />
                     <div style={S.eventMeta}>
-                      <p style={S.eventType(success)}>{ev.type}</p>
-                      <p style={S.eventDesc}>
-                        {ev.data?.tenantName ?? ev.data?.tenant ?? 'Unknown Tenant'}
-                        {ev.data?.amount ? ` — ${formatINR(ev.data.amount)}` : ''}
-                      </p>
+                      <p style={S.eventType(success)}>{cfg.label}</p>
+                      <p style={S.eventDesc}>{descParts.join(' · ') || 'Platform event'}</p>
                     </div>
                     <span style={S.eventTime}>{timeAgo(ev.ts)}</span>
                   </div>

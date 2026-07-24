@@ -90,6 +90,10 @@ const startServer = async () => {
   const { initChurnAnalysisCron } = require('./cron/churnAnalysis.cron');
   initChurnAnalysisCron();
 
+  // Phase 10 — Revenue Forecast Worker
+  require('./jobs/forecast.worker');
+  logger.info('Forecast worker started');
+
   // ── Start listening ───────────────────────────────
   server.listen(PORT, () => {
     logger.info(`TenantFlow server running on port ${PORT} [${process.env.NODE_ENV}]`);

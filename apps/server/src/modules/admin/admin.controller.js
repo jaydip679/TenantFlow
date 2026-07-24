@@ -112,6 +112,26 @@ const getCohortRetention = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
+/**
+ * GET /admin/metrics/forecast
+ * Return the most recent revenue forecast document.
+ */
+const getForecast = asyncHandler(async (req, res) => {
+  const RevenueForecast = require('../../models/RevenueForecast.model');
+  const doc = await RevenueForecast.findOne({}).sort({ computedAt: -1 }).lean();
+  res.status(200).json({ success: true, data: doc || null });
+});
+
+/**
+ * POST /admin/metrics/forecast/trigger
+ * Enqueue a fresh forecast computation job.
+ */
+const triggerForecast = asyncHandler(async (req, res) => {
+  const { enqueueForecastJob } = require('../../queues/forecast.queue');
+  const job = await enqueueForecastJob();
+  res.status(202).json({ success: true, data: { jobId: job.id, message: 'Forecast job enqueued.' } });
+});
+
 module.exports = {
   getPlatformMetrics,
   listTenants,
@@ -122,4 +142,6 @@ module.exports = {
   getMrrMovements,
   getCashFlowForecast,
   getCohortRetention,
+  getForecast,
+  triggerForecast,
 };

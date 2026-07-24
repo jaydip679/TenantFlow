@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, Cell,
+  Legend, AreaChart, Area, ReferenceLine,
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, DollarSign, AlertTriangle,
-  Calendar, Users, BarChart2, RefreshCw,
+  Calendar, Users, BarChart2, RefreshCw, Zap, Cpu,
 } from 'lucide-react';
 import AdminLayout from '../../components/layout/AdminLayout.jsx';
-import { getMrrMovements, getCashFlowForecast, getCohortRetention } from '../../services/adminService.js';
+import { getMrrMovements, getCashFlowForecast, getCohortRetention, getForecast, triggerForecast } from '../../services/adminService.js';
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const ACCENT   = '#6c63ff';
@@ -298,34 +299,189 @@ function Empty({ msg }) {
   );
 }
 
+// ── Forecast Chart ────────────────────────────────────────────────────────────
+function ForecastChart({ data, loading, onTrigger, triggering }) {
+  if (loading) return <Skeleton h={320} />;
+  if (!data) return (
+    <div style={{ ...card, textAlign: 'center', padding: 60 }}>
+      <Cpu size={40} color={MUTED} style={{ margin: '0 auto 16px', display: 'block' }} />
+      <p style={{ margin: '0 0 6px', fontSize: 15, color: TEXT, fontWeight: 600 }}>No forecast generated yet</p>
+      <p style={{ margin: '0 0 20px', fontSize: 13, color: MUTED }}>Click the button below to compute a 3-month MRR forecast using linear regression + AI narrative.</p>
+      <button
+        onClick={onTrigger}
+        disabled={triggering}
+        style={{ padding: '10px 24px', borderRadius: 9, border: 'none', background: `linear-gradient(135deg,${ACCENT},#a78bfa)`, color: '#fff', cursor: triggering ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600, opacity: triggering ? 0.7 : 1 }}
+      >
+        {triggering ? 'Computing…' : '⚡ Generate Forecast'}
+      </button>
+    </div>
+  );
+
+  const { forecastMonths, trend, confidence, narrative, modelVersion, computedAt } = data;
+  const trendColor = trend === 'growth' ? GREEN : trend === 'decline' ? RED : ORANGE;
+
+  // Build chart data
+  const chartData = (forecastMonths || []).map(m => ({
+    month:    m.month,
+    forecast: Math.round(m.forecastedMrr / 100),
+    low:      Math.round(m.low / 100),
+    high:     Math.round(m.high / 100),
+  }));
+
+  function formatINR(v) {
+    return '₹' + v.toLocaleString('en-IN');
+  }
+
+  const ForecastTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={{ background: '#1a1a2e', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '10px 14px', fontSize: 12, color: TEXT }}>
+        <p style={{ margin: '0 0 6px', fontWeight: 600 }}>{label}</p>
+        <p style={{ margin: '2px 0', color: ACCENT }}>Forecast: {formatINR(payload[0]?.payload?.forecast)}</p>
+        <p style={{ margin: '2px 0', color: MUTED, fontSize: 11 }}>Range: {formatINR(payload[0]?.payload?.low)} – {formatINR(payload[0]?.payload?.high)}</p>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* KPI strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <div style={card}>
+          <p style={{ margin: '0 0 6px', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Trend</p>
+          <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: trendColor }}>
+            {trend === 'growth' ? '📈 Growth' : trend === 'decline' ? '📉 Decline' : '➡️ Stable'}
+          </p>
+        </div>
+        <div style={card}>
+          <p style={{ margin: '0 0 6px', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Confidence</p>
+          <p style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 700, color: confidence >= 70 ? GREEN : confidence >= 40 ? ORANGE : RED }}>{confidence}%</p>
+          <div style={{ width: '100%', height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}>
+            <div style={{ width: `${confidence}%`, height: '100%', borderRadius: 2, background: confidence >= 70 ? GREEN : confidence >= 40 ? ORANGE : RED }} />
+          </div>
+        </div>
+        <div style={card}>
+          <p style={{ margin: '0 0 6px', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>3-Month Projection</p>
+          <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: TEXT }}>
+            {chartData.length ? formatINR(chartData[chartData.length - 1].forecast) : '—'}
+          </p>
+          <p style={{ margin: '3px 0 0', fontSize: 11, color: MUTED }}>Ending MRR by {chartData[chartData.length - 1]?.month}</p>
+        </div>
+      </div>
+
+      {/* Area chart */}
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: TEXT }}>3-Month MRR Forecast</p>
+          <span style={{ fontSize: 11, color: MUTED }}>Shaded band = ±1.5σ confidence interval</span>
+        </div>
+        <ResponsiveContainer width="100%" height={240}>
+          <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor={ACCENT} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={ACCENT} stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+            <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={v => `₹${v.toLocaleString('en-IN')}`} tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
+            <Tooltip content={<ForecastTooltip />} />
+            <Area type="monotone" dataKey="high"     stroke="transparent" fill={`${ACCENT}18`} />
+            <Area type="monotone" dataKey="forecast" stroke={ACCENT} strokeWidth={2.5} fill="url(#forecastGrad)" dot={{ fill: ACCENT, r: 5, strokeWidth: 2, stroke: '#1a1a2e' }} />
+            <Area type="monotone" dataKey="low"      stroke="transparent" fill="transparent" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* AI Narrative */}
+      {narrative && (
+        <div style={{ ...card, border: `1px solid rgba(108,99,255,0.25)`, background: 'rgba(108,99,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Cpu size={15} color={ACCENT} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#a78bfa' }}>AI Insight</span>
+            <span style={{ fontSize: 11, color: MUTED, marginLeft: 'auto' }}>via {modelVersion || 'AI'} · {computedAt ? new Date(computedAt).toLocaleString() : ''}</span>
+          </div>
+          <p style={{ margin: 0, fontSize: 14, color: TEXT, lineHeight: 1.7 }}>{narrative}</p>
+        </div>
+      )}
+
+      {/* Trigger recompute */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          onClick={onTrigger}
+          disabled={triggering}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: `1px solid rgba(108,99,255,0.3)`, background: 'rgba(108,99,255,0.08)', color: '#a78bfa', cursor: triggering ? 'not-allowed' : 'pointer', fontSize: 13, opacity: triggering ? 0.7 : 1 }}
+        >
+          <Zap size={14} /> {triggering ? 'Computing…' : 'Recompute Forecast'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function RevenueIntelligencePage() {
   const [tab, setTab] = useState('mrr');
+  const socketRef = useRef(null);
 
-  const [mrrData,      setMrrData]      = useState([]);
-  const [cashData,     setCashData]     = useState([]);
-  const [cohortData,   setCohortData]   = useState([]);
-  const [mrrLoading,   setMrrLoading]   = useState(true);
-  const [cashLoading,  setCashLoading]  = useState(true);
-  const [cohortLoading,setCohortLoading]= useState(true);
-  const [lastRefresh,  setLastRefresh]  = useState(null);
+  const [mrrData,       setMrrData]       = useState([]);
+  const [cashData,      setCashData]      = useState([]);
+  const [cohortData,    setCohortData]    = useState([]);
+  const [forecastData,  setForecastData]  = useState(null);
+  const [mrrLoading,    setMrrLoading]    = useState(true);
+  const [cashLoading,   setCashLoading]   = useState(true);
+  const [cohortLoading, setCohortLoading] = useState(true);
+  const [forecastLoading,setForecastLoading] = useState(true);
+  const [triggering,    setTriggering]    = useState(false);
+  const [lastRefresh,   setLastRefresh]   = useState(null);
 
   const loadAll = async () => {
-    setMrrLoading(true); setCashLoading(true); setCohortLoading(true);
+    setMrrLoading(true); setCashLoading(true); setCohortLoading(true); setForecastLoading(true);
     try { const r = await getMrrMovements(6);      setMrrData(r.data.data   || []); } catch { setMrrData([]); }
     finally { setMrrLoading(false); }
     try { const r = await getCashFlowForecast(3);  setCashData(r.data.data  || []); } catch { setCashData([]); }
     finally { setCashLoading(false); }
     try { const r = await getCohortRetention(6);   setCohortData(r.data.data|| []); } catch { setCohortData([]); }
-    finally { setCohortLoading(false); setLastRefresh(new Date()); }
+    finally { setCohortLoading(false); }
+    try { const r = await getForecast();            setForecastData(r.data.data || null); } catch { setForecastData(null); }
+    finally { setForecastLoading(false); setLastRefresh(new Date()); }
   };
 
-  useEffect(() => { loadAll(); }, []);
+  const handleTriggerForecast = async () => {
+    setTriggering(true);
+    try {
+      await triggerForecast();
+      // Data will arrive via Socket.IO; poll as fallback after 8s
+      setTimeout(async () => {
+        try { const r = await getForecast(); setForecastData(r.data.data || null); } catch {}
+        setTriggering(false);
+      }, 8000);
+    } catch { setTriggering(false); }
+  };
+
+  useEffect(() => {
+    loadAll();
+
+    // Real-time: listen for forecast updates from server
+    const socket = io('/admin', { transports: ['websocket', 'polling'] });
+    socketRef.current = socket;
+
+    socket.on('admin:forecast:updated', (data) => {
+      setForecastData(data);
+      setTriggering(false);
+      setLastRefresh(new Date());
+    });
+
+    return () => socket.disconnect();
+  }, []);
 
   const TABS = [
-    { id: 'mrr',    label: 'MRR Waterfall',   icon: BarChart2 },
-    { id: 'cash',   label: 'Renewal Calendar', icon: Calendar },
-    { id: 'cohort', label: 'Cohort Retention', icon: Users },
+    { id: 'mrr',      label: 'MRR Waterfall',   icon: BarChart2 },
+    { id: 'cash',     label: 'Renewal Calendar', icon: Calendar },
+    { id: 'cohort',   label: 'Cohort Retention', icon: Users },
+    { id: 'forecast', label: 'AI Forecast',       icon: Cpu },
   ];
 
   return (
@@ -403,6 +559,21 @@ export default function RevenueIntelligencePage() {
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: 'rgba(248,113,113,0.4)', display: 'inline-block' }} />&lt;60% At Risk</span>
             </div>
             <CohortHeatMap data={cohortData} loading={cohortLoading} />
+          </>
+        )}
+
+        {tab === 'forecast' && (
+          <>
+            <SectionHeader
+              title="3-Month Revenue Forecast"
+              subtitle="Deterministic linear regression on MRR trend · AI-generated narrative insight"
+            />
+            <ForecastChart
+              data={forecastData}
+              loading={forecastLoading}
+              onTrigger={handleTriggerForecast}
+              triggering={triggering}
+            />
           </>
         )}
       </div>

@@ -186,6 +186,24 @@ const createSubscription = async (tenantId, planId, options = {}) => {
 
   await invalidateTenantCache(tenantId.toString());
 
+  // Emit Socket.IO: admin:subscription:created (new revenue signal)
+  try {
+    const app = require('../../app');
+    const io  = app.get('io');
+    if (io) {
+      const { emitToAdmins } = require('../../sockets/admin.namespace');
+      emitToAdmins(io, 'admin:subscription:created', {
+        tenantId,
+        planId:   plan._id,
+        planName: plan.displayName,
+        status,
+        createdAt: subscription.createdAt,
+      });
+    }
+  } catch (socketErr) {
+    require('../../shared/utils/logger').warn({ err: socketErr.message }, 'Socket.IO subscription:created emit failed (non-critical)');
+  }
+
   return subscription;
 };
 
@@ -454,6 +472,24 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
   // 13. Invalidate cache (after transaction commits)
   await invalidateTenantCache(tenantId.toString());
 
+  // Emit Socket.IO: admin:subscription:upgraded (revenue change)
+  try {
+    const app = require('../../app');
+    const io  = app.get('io');
+    if (io) {
+      const { emitToAdmins } = require('../../sockets/admin.namespace');
+      emitToAdmins(io, 'admin:subscription:upgraded', {
+        tenantId,
+        toPlanId:   targetPlan._id,
+        toPlanName: targetPlan.displayName,
+        toPrice:    targetPlan.price,
+        upgradedAt: new Date(),
+      });
+    }
+  } catch (socketErr) {
+    require('../../shared/utils/logger').warn({ err: socketErr.message }, 'Socket.IO subscription:upgraded emit failed (non-critical)');
+  }
+
   return result;
 };
 
@@ -524,6 +560,22 @@ const downgradeSubscription = async (tenantId, targetPlanId, reason, actorUser, 
     }),
     invalidateTenantCache(tenantId.toString()),
   ]);
+
+  // Emit Socket.IO: admin:subscription:downgraded (plan change signal)
+  try {
+    const app = require('../../app');
+    const io  = app.get('io');
+    if (io) {
+      const { emitToAdmins } = require('../../sockets/admin.namespace');
+      emitToAdmins(io, 'admin:subscription:downgraded', {
+        tenantId,
+        toPlanName:  targetPlan.displayName,
+        scheduledAt: new Date(),
+      });
+    }
+  } catch (socketErr) {
+    require('../../shared/utils/logger').warn({ err: socketErr.message }, 'Socket.IO subscription:downgraded emit failed (non-critical)');
+  }
 
   return {
     subscription: subscription.toObject(),
