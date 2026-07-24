@@ -20,14 +20,16 @@ const SubscriptionPage    = lazy(() => import("../pages/settings/SubscriptionPag
 const MembersPage         = lazy(() => import("../pages/settings/MembersPage.jsx"));
 const ProfilePage         = lazy(() => import("../pages/settings/ProfilePage.jsx"));
 
-const AdminDashboardPage  = lazy(() => import("../pages/admin/AdminDashboardPage.jsx"));
-const AdminTenantsPage    = lazy(() => import("../pages/admin/TenantsPage.jsx"));
-const AdminInvoicesPage   = lazy(() => import("../pages/admin/AdminInvoicesPage.jsx"));
-const AdminDunningPage    = lazy(() => import("../pages/admin/DunningPage.jsx"));
-const AdminChurnRiskPage  = lazy(() => import("../pages/admin/ChurnRiskPage.jsx"));
-const AdminQueuesPage     = lazy(() => import("../pages/admin/AdminQueuesPage.jsx"));
-const TenantDetailPage    = lazy(() => import("../pages/admin/TenantDetailPage.jsx"));
+const AdminDashboardPage      = lazy(() => import("../pages/admin/AdminDashboardPage.jsx"));
+const AdminTenantsPage        = lazy(() => import("../pages/admin/TenantsPage.jsx"));
+const AdminInvoicesPage       = lazy(() => import("../pages/admin/AdminInvoicesPage.jsx"));
+const AdminDunningPage        = lazy(() => import("../pages/admin/DunningPage.jsx"));
+const AdminChurnRiskPage      = lazy(() => import("../pages/admin/ChurnRiskPage.jsx"));
+const AdminQueuesPage         = lazy(() => import("../pages/admin/AdminQueuesPage.jsx"));
+const TenantDetailPage        = lazy(() => import("../pages/admin/TenantDetailPage.jsx"));
 const RevenueIntelligencePage = lazy(() => import("../pages/admin/RevenueIntelligencePage.jsx"));
+const HealthScoresPage        = lazy(() => import("../pages/admin/HealthScoresPage.jsx"));
+const ExpansionPage           = lazy(() => import("../pages/admin/ExpansionPage.jsx"));
 
 function RootRedirect() {
   const { isAuthenticated, user } = useSelector((s) => s.auth);
@@ -93,6 +95,8 @@ export default function AppRouter() {
           <Route path="/admin/tenants"                 element={<ARoute element={<AdminTenantsPage />} />} />
           <Route path="/admin/tenants/:tenantId"       element={<ARoute element={<TenantDetailPage />} />} />
           <Route path="/admin/revenue"                 element={<ARoute element={<RevenueIntelligencePage />} />} />
+          <Route path="/admin/health-scores"           element={<ARoute element={<HealthScoresPage />} />} />
+          <Route path="/admin/expansion"               element={<ARoute element={<ExpansionPage />} />} />
           <Route path="/admin/invoices"                element={<ARoute element={<AdminInvoicesPage />} />} />
           <Route path="/admin/dunning"                 element={<ARoute element={<AdminDunningPage />} />} />
           <Route path="/admin/churn-risk"              element={<ARoute element={<AdminChurnRiskPage />} />} />

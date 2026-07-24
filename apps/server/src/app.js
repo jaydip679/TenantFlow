@@ -206,6 +206,10 @@ app.use('/api/v1/ai', aiRoutes);
 const adminRoutes = require('./modules/admin/admin.routes');
 app.use('/api/v1/admin', adminRoutes);
 
+// Phase 10 — Customer Health Scores & Expansion Opportunities
+const healthRoutes = require('./modules/health/health.routes');
+app.use('/api/v1/admin', healthRoutes);
+
 // Phase 9 — Bull Board (queue monitor UI)
 // Mounted at /admin/queues (separate from /api/v1 to avoid JWT middleware)
 // Protected by HTTP Basic Auth (BULL_BOARD_USERNAME / BULL_BOARD_PASSWORD)

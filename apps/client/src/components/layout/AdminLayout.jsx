@@ -8,6 +8,8 @@ import {
   Bell,
   TrendingDown,
   TrendingUp,
+  ArrowUpCircle,
+  Heart,
   Server,
   LogOut,
   Menu,
@@ -28,9 +30,11 @@ const TEXT_PRIMARY  = "#f0f0ff";
 const TEXT_MUTED    = "#8b8bad";
 
 const navItems = [
-  { to: "/admin",              icon: LayoutDashboard, label: "Dashboard",  end: true },
+  { to: "/admin",              icon: LayoutDashboard, label: "Dashboard",    end: true },
   { to: "/admin/tenants",      icon: Building2,       label: "Tenants" },
   { to: "/admin/revenue",      icon: TrendingUp,      label: "Revenue Intel" },
+  { to: "/admin/health-scores",icon: Heart,           label: "Health Scores" },
+  { to: "/admin/expansion",    icon: ArrowUpCircle,   label: "Expansion" },
   { to: "/admin/invoices",     icon: FileText,        label: "Invoices" },
   { to: "/admin/dunning",      icon: Bell,            label: "Dunning" },
   { to: "/admin/churn-risk",   icon: TrendingDown,    label: "Churn Risk" },
