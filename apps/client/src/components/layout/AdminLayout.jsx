@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -7,6 +7,7 @@ import {
   FileText,
   Bell,
   TrendingDown,
+  TrendingUp,
   Server,
   LogOut,
   Menu,
@@ -27,12 +28,13 @@ const TEXT_PRIMARY  = "#f0f0ff";
 const TEXT_MUTED    = "#8b8bad";
 
 const navItems = [
-  { to: "/admin",            icon: LayoutDashboard, label: "Dashboard",  end: true },
-  { to: "/admin/tenants",    icon: Building2,       label: "Tenants" },
-  { to: "/admin/invoices",   icon: FileText,        label: "Invoices" },
-  { to: "/admin/dunning",    icon: Bell,            label: "Dunning" },
-  { to: "/admin/churn-risk", icon: TrendingDown,    label: "Churn Risk" },
-  { to: "/admin/queues",     icon: Server,          label: "Queues" },
+  { to: "/admin",              icon: LayoutDashboard, label: "Dashboard",  end: true },
+  { to: "/admin/tenants",      icon: Building2,       label: "Tenants" },
+  { to: "/admin/revenue",      icon: TrendingUp,      label: "Revenue Intel" },
+  { to: "/admin/invoices",     icon: FileText,        label: "Invoices" },
+  { to: "/admin/dunning",      icon: Bell,            label: "Dunning" },
+  { to: "/admin/churn-risk",   icon: TrendingDown,    label: "Churn Risk" },
+  { to: "/admin/queues",       icon: Server,          label: "Queues" },
 ];
 
 const GLOBAL_CSS = `

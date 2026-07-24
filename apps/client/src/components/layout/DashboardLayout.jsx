@@ -36,13 +36,18 @@ const dropItemStyle = {
 };
 
 
-const navItems = [
-  { to: "/dashboard",              icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/dashboard/invoices",     icon: FileText,        label: "Invoices"  },
-  { to: "/dashboard/payments",     icon: CreditCard,      label: "Payments"  },
-  { to: "/dashboard/subscription", icon: Repeat,          label: "Subscription" },
-  { to: "/dashboard/members",      icon: Users,           label: "Members"   },
+// All possible nav items — filtered per role below
+const ALL_NAV_ITEMS = [
+  { to: "/dashboard",              icon: LayoutDashboard, label: "Dashboard",    roles: ['tenant_admin', 'tenant_member'] },
+  { to: "/dashboard/invoices",     icon: FileText,        label: "Invoices",     roles: ['tenant_admin', 'tenant_member', 'finance_member'] },
+  { to: "/dashboard/payments",     icon: CreditCard,      label: "Payments",     roles: ['tenant_admin', 'tenant_member', 'finance_member'] },
+  { to: "/dashboard/subscription", icon: Repeat,          label: "Subscription", roles: ['tenant_admin'] },
+  { to: "/dashboard/members",      icon: Users,           label: "Members",      roles: ['tenant_admin'] },
 ];
+
+function getNavItems(role) {
+  return ALL_NAV_ITEMS.filter(item => !item.roles || item.roles.includes(role));
+}
 
 // inject global CSS once
 const GLOBAL_CSS = `
@@ -79,9 +84,10 @@ function injectCSS() {
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
-function Sidebar({ collapsed, onToggle }) {
+function Sidebar({ collapsed, onToggle, role }) {
   injectCSS();
-  const w = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
+  const w        = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
+  const navItems = getNavItems(role);
 
   return (
     <aside
@@ -296,10 +302,11 @@ function TopBar({ sidebarWidth }) {
 export default function DashboardLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const sidebarWidth = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
+  const { user }     = useSelector((s) => s.auth);
 
   return (
     <div style={{ minHeight: "100vh", background: BG_DEEP, color: TEXT_PRIMARY, fontFamily: "system-ui, sans-serif" }}>
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} role={user?.role} />
       <TopBar sidebarWidth={sidebarWidth} />
 
       <main

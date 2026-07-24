@@ -31,6 +31,13 @@ const router = express.Router();
 router.use(cookieParser());
 
 /**
+ * GET /invite/validate  (public — no auth, token from email link query param)
+ * Must be registered BEFORE /:tenantId to avoid param conflict.
+ * Returns: { tenantId, tenantName, email, role }
+ */
+router.get('/invite/validate', tenantController.validateInviteToken);
+
+/**
  * @swagger
  * tags:
  *   name: tenants
@@ -42,6 +49,9 @@ router.use(cookieParser());
  * /tenants/{tenantId}:
  *   get:
  *     summary: Get tenant profile
+ *     description: |
+ *       Fetches the tenant's profile, including billing address and current plan name.
+ *       Requires tenantScope middleware — cross-tenant reads are blocked (TENANT_SCOPE_VIOLATION).
  *     tags: [tenants]
  *     security:
  *       - BearerAuth: []

@@ -541,6 +541,47 @@ const updateAvatar = async (userId, fileBuffer, mimetype) => {
   return { avatarUrl: updatedUser.avatarUrl };
 };
 
+/**
+ * Change password for an authenticated user.
+ * Requires knowledge of the current password (unlike resetPassword which uses OTP).
+ * Invalidates ALL active sessions after change — forces re-login on all devices.
+ *
+ * @param {string} userId
+ * @param {string} currentPassword
+ * @param {string} newPassword
+ */
+const changePassword = async (userId, currentPassword, newPassword) => {
+  const user = await User.findById(userId);
+  if (!user) throw new AppError('User not found.', 404, ERROR_CODES.NOT_FOUND);
+
+  // Verify current password
+  const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!isValid) {
+    throw new AppError('Current password is incorrect.', 401, ERROR_CODES.AUTH_INVALID_CREDENTIALS);
+  }
+
+  if (currentPassword === newPassword) {
+    throw new AppError('New password must be different from the current password.', 422, ERROR_CODES.VALIDATION_ERROR);
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST);
+  await User.findByIdAndUpdate(userId, { passwordHash });
+
+  // Invalidate ALL active refresh tokens — user must re-login everywhere
+  await RefreshToken.updateMany(
+    { userId, status: 'active' },
+    { $set: { status: 'invalidated' } }
+  );
+
+  await createAuditLog({
+    event:        'user.password_changed',
+    resourceType: 'user',
+    resourceId:   userId,
+    tenantId:     user.tenantId,
+    actor:        { userId, role: user.role, email: user.email },
+  });
+};
+
 module.exports = {
   register,
   verifyEmail,
@@ -552,4 +593,5 @@ module.exports = {
   getMe,
   updateMe,
   updateAvatar,
+  changePassword,
 };

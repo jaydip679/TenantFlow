@@ -10,6 +10,7 @@ const LoginPage           = lazy(() => import("../pages/auth/LoginPage.jsx"));
 const RegisterPage        = lazy(() => import("../pages/auth/RegisterPage.jsx"));
 const ForgotPasswordPage  = lazy(() => import("../pages/auth/ForgotPasswordPage.jsx"));
 const ResetPasswordPage   = lazy(() => import("../pages/auth/ResetPasswordPage.jsx"));
+const AcceptInvitePage    = lazy(() => import("../pages/auth/AcceptInvitePage.jsx"));
 const UnauthorizedPage    = lazy(() => import("../pages/UnauthorizedPage.jsx"));
 
 const DashboardPage       = lazy(() => import("../pages/dashboard/DashboardPage.jsx"));
@@ -26,15 +27,17 @@ const AdminDunningPage    = lazy(() => import("../pages/admin/DunningPage.jsx"))
 const AdminChurnRiskPage  = lazy(() => import("../pages/admin/ChurnRiskPage.jsx"));
 const AdminQueuesPage     = lazy(() => import("../pages/admin/AdminQueuesPage.jsx"));
 const TenantDetailPage    = lazy(() => import("../pages/admin/TenantDetailPage.jsx"));
+const RevenueIntelligencePage = lazy(() => import("../pages/admin/RevenueIntelligencePage.jsx"));
 
 function RootRedirect() {
   const { isAuthenticated, user } = useSelector((s) => s.auth);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   switch (user?.role) {
-    case "super_admin":   return <Navigate to="/admin"     replace />;
+    case "super_admin":    return <Navigate to="/admin"               replace />;
     case "tenant_admin":
-    case "tenant_member": return <Navigate to="/dashboard" replace />;
-    default:              return <Navigate to="/login"     replace />;
+    case "tenant_member":  return <Navigate to="/dashboard"           replace />;
+    case "finance_member": return <Navigate to="/dashboard/invoices"  replace />;
+    default:               return <Navigate to="/login"               replace />;
   }
 }
 
@@ -52,7 +55,7 @@ function PageLoader() {
   );
 }
 
-const TENANT_ROLES = ["tenant_admin", "tenant_member"];
+const TENANT_ROLES = ["tenant_admin", "tenant_member", "finance_member"];
 const ADMIN_ROLES  = ["super_admin"];
 
 function TRoute({ element }) {
@@ -74,6 +77,7 @@ export default function AppRouter() {
           <Route path="/register"        element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password"  element={<ResetPasswordPage />} />
+          <Route path="/accept-invite"   element={<AcceptInvitePage />} />
           <Route path="/unauthorized"    element={<UnauthorizedPage />} />
 
           {/* Tenant */}
@@ -88,6 +92,7 @@ export default function AppRouter() {
           <Route path="/admin"                         element={<ARoute element={<AdminDashboardPage />} />} />
           <Route path="/admin/tenants"                 element={<ARoute element={<AdminTenantsPage />} />} />
           <Route path="/admin/tenants/:tenantId"       element={<ARoute element={<TenantDetailPage />} />} />
+          <Route path="/admin/revenue"                 element={<ARoute element={<RevenueIntelligencePage />} />} />
           <Route path="/admin/invoices"                element={<ARoute element={<AdminInvoicesPage />} />} />
           <Route path="/admin/dunning"                 element={<ARoute element={<AdminDunningPage />} />} />
           <Route path="/admin/churn-risk"              element={<ARoute element={<AdminChurnRiskPage />} />} />

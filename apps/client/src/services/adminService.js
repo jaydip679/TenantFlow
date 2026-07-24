@@ -28,3 +28,8 @@ export const triggerChurnAnalysis = (tenantId) => api.post(`/ai/churn/trigger/${
 
 // ── Queue Stats ───────────────────────────────────────────────────────────────
 export const getQueueStats = () => api.get('/admin/queues');
+
+// ── Revenue Intelligence ─────────────────────────────────────────────────────
+export const getMrrMovements    = (months = 6)   => api.get('/admin/metrics/mrr-movements',   { params: { months } });
+export const getCashFlowForecast= (months = 3)   => api.get('/admin/metrics/cash-flow',        { params: { months } });
+export const getCohortRetention = (cohorts = 6)  => api.get('/admin/metrics/cohort-retention', { params: { cohorts } });

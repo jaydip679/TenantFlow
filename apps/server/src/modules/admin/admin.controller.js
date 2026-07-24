@@ -85,6 +85,33 @@ const getQueueStats = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: stats });
 });
 
+/**
+ * GET /admin/metrics/mrr-movements?months=6
+ */
+const getMrrMovements = asyncHandler(async (req, res) => {
+  const months = Math.min(parseInt(req.query.months, 10) || 6, 12);
+  const data   = await adminService.getMrrMovements(months);
+  res.status(200).json({ success: true, data });
+});
+
+/**
+ * GET /admin/metrics/cash-flow?months=3
+ */
+const getCashFlowForecast = asyncHandler(async (req, res) => {
+  const months = Math.min(parseInt(req.query.months, 10) || 3, 6);
+  const data   = await adminService.getCashFlowForecast(months);
+  res.status(200).json({ success: true, data });
+});
+
+/**
+ * GET /admin/metrics/cohort-retention?cohorts=6
+ */
+const getCohortRetention = asyncHandler(async (req, res) => {
+  const cohorts = Math.min(parseInt(req.query.cohorts, 10) || 6, 12);
+  const data    = await adminService.getCohortRetention(cohorts);
+  res.status(200).json({ success: true, data });
+});
+
 module.exports = {
   getPlatformMetrics,
   listTenants,
@@ -92,4 +119,7 @@ module.exports = {
   forceStatusChange,
   listAllInvoices,
   getQueueStats,
+  getMrrMovements,
+  getCashFlowForecast,
+  getCohortRetention,
 };

@@ -294,4 +294,24 @@ router.patch('/me', authenticate, validate(updateMeSchema), authController.updat
  */
 router.post('/me/avatar', authenticate, imageUpload.single('avatar'), authController.updateAvatar);
 
+/**
+ * POST /auth/me/change-password
+ * Authenticated user changes their own password.
+ * Requires current password for verification. Invalidates all sessions after change.
+ */
+const changePasswordSchema = Joi.object({
+  params: Joi.object(),
+  query:  Joi.object(),
+  body: Joi.object({
+    currentPassword: Joi.string().required(),
+    newPassword: Joi.string()
+      .min(8)
+      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+      .required()
+      .messages({ 'string.pattern.base': 'New password must contain uppercase, lowercase, number and special character.' }),
+  }),
+});
+
+router.post('/me/change-password', authenticate, validate(changePasswordSchema), authController.changePassword);
+
 module.exports = router;

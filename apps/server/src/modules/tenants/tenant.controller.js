@@ -68,6 +68,15 @@ const inviteMember = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /invite/validate?token=:uuid  (public — no auth)
+ * Returns invite context so the accept-invite page can render.
+ */
+const validateInviteToken = asyncHandler(async (req, res) => {
+  const context = await tenantService.validateInviteToken(req.query.token);
+  res.status(200).json({ success: true, data: context });
+});
+
+/**
  * POST /:tenantId/members/accept-invite
  */
 const acceptInvite = asyncHandler(async (req, res) => {
@@ -115,6 +124,7 @@ module.exports = {
   uploadLogo,
   getMembers,
   inviteMember,
+  validateInviteToken,
   acceptInvite,
   removeMember,
   changeMemberRole,

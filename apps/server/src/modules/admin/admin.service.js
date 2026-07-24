@@ -531,4 +531,324 @@ module.exports = {
   listAllInvoices,
   getActiveDunningRecords,
   getQueueStats,
+  getMrrMovements,
+  getCashFlowForecast,
+  getCohortRetention,
+};
+
+// ── getMrrMovements() ──────────────────────────────────────────────────────
+/**
+ * Compute monthly MRR movement waterfall for the last N months.
+ * Returns: New MRR, Expansion MRR, Contraction MRR, Churned MRR, Reactivation MRR,
+ *          Net New MRR, NRR (Net Revenue Retention), Quick Ratio per month.
+ *
+ * Algorithm:
+ *  - For each month M, compute beginning MRR (active subs at start of M).
+ *  - New MRR: tenants whose subscription started in month M.
+ *  - Expansion MRR: upgrade events in month M (toPlanVersion.price - fromPlanVersion.price).
+ *  - Contraction MRR: downgrade events in month M.
+ *  - Churned MRR: cancellations in month M (based on last-known plan price).
+ *  - Reactivation MRR: reactivation events in month M.
+ *  - Ending MRR = beginning + Net New.
+ *  - NRR = (Beginning MRR + Expansion - Contraction - Churned) / Beginning MRR × 100.
+ *  - Quick Ratio = (New + Expansion + Reactivation) / (Contraction + Churned).
+ *
+ * @param {number} months  Number of months to look back (default 6)
+ * @returns {Array<{month, newMrr, expansionMrr, contractionMrr, churnedMrr, reactivationMrr, netNewMrr, endingMrr, nrr, quickRatio}>}
+ */
+const getMrrMovements = async (months = 6) => {
+  const now    = new Date();
+  const result = [];
+
+  for (let i = months - 1; i >= 0; i--) {
+    const ref        = subMonths(now, i);
+    const monthStart = startOfMonth(ref);
+    const monthEnd   = endOfMonth(ref);
+    const label      = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
+
+    // Helper: normalize plan price to monthly
+    const monthlyPrice = (price, interval) => (interval === 'annual' ? Math.round(price / 12) : price);
+
+    // ── Beginning MRR (active at start of month) ──────────────────
+    const beginSubs = await Subscription.aggregate([
+      {
+        $match: {
+          createdAt: { $lte: monthStart },
+          $or: [
+            { cancelledAt: null },
+            { cancelledAt: { $gt: monthStart } },
+          ],
+          status: { $in: ['active', 'trialing'] },
+        },
+      },
+      {
+        $lookup: {
+          from: 'planversions', localField: 'planVersionId',
+          foreignField: '_id', as: 'pv',
+        },
+      },
+      { $unwind: { path: '$pv', preserveNullAndEmpty: true } },
+      {
+        $group: {
+          _id: null,
+          mrr: {
+            $sum: {
+              $cond: [{ $eq: ['$pv.interval', 'annual'] }, { $divide: ['$pv.price', 12] }, { $ifNull: ['$pv.price', 0] }],
+            },
+          },
+        },
+      },
+    ]);
+    const beginMrr = Math.round(beginSubs[0]?.mrr || 0);
+
+    // ── New MRR (new subscriptions started this month) ──────────────
+    const newSubs = await Subscription.aggregate([
+      { $match: { createdAt: { $gte: monthStart, $lte: monthEnd } } },
+      {
+        $lookup: {
+          from: 'planversions', localField: 'planVersionId',
+          foreignField: '_id', as: 'pv',
+        },
+      },
+      { $unwind: { path: '$pv', preserveNullAndEmpty: true } },
+      {
+        $group: {
+          _id: null,
+          mrr: {
+            $sum: {
+              $cond: [{ $eq: ['$pv.interval', 'annual'] }, { $divide: ['$pv.price', 12] }, { $ifNull: ['$pv.price', 0] }],
+            },
+          },
+        },
+      },
+    ]);
+    const newMrr = Math.round(newSubs[0]?.mrr || 0);
+
+    // ── Expansion / Contraction / Churned / Reactivation from SubscriptionEvent ─
+    const events = await SubscriptionEvent.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: monthStart, $lte: monthEnd },
+          event:     { $in: ['subscription.upgraded', 'subscription.downgraded', 'subscription.cancelled', 'subscription.reactivated'] },
+        },
+      },
+      // Lookup the TO plan version
+      {
+        $lookup: {
+          from: 'planversions', localField: 'toPlanVersionId',
+          foreignField: '_id', as: 'toPv',
+        },
+      },
+      {
+        $lookup: {
+          from: 'planversions', localField: 'fromPlanVersionId',
+          foreignField: '_id', as: 'fromPv',
+        },
+      },
+      {
+        $addFields: {
+          toPv:   { $arrayElemAt: ['$toPv', 0] },
+          fromPv: { $arrayElemAt: ['$fromPv', 0] },
+        },
+      },
+      {
+        $group: {
+          _id: '$event',
+          delta: {
+            $sum: {
+              $subtract: [
+                {
+                  $cond: [
+                    { $eq: ['$toPv.interval', 'annual'] },
+                    { $divide: [{ $ifNull: ['$toPv.price', 0] }, 12] },
+                    { $ifNull: ['$toPv.price', 0] },
+                  ],
+                },
+                {
+                  $cond: [
+                    { $eq: ['$fromPv.interval', 'annual'] },
+                    { $divide: [{ $ifNull: ['$fromPv.price', 0] }, 12] },
+                    { $ifNull: ['$fromPv.price', 0] },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const evMap = {};
+    events.forEach(e => { evMap[e._id] = Math.round(e.delta); });
+
+    const expansionMrr    = Math.max(0,  evMap['subscription.upgraded']    || 0);
+    const contractionMrr  = Math.abs(Math.min(0, evMap['subscription.downgraded']  || 0));
+    const churnedMrr      = Math.abs(evMap['subscription.cancelled']   || 0);
+    const reactivationMrr = Math.max(0,  evMap['subscription.reactivated'] || 0);
+
+    const netNewMrr  = newMrr + expansionMrr + reactivationMrr - contractionMrr - churnedMrr;
+    const endingMrr  = beginMrr + netNewMrr;
+    const nrr        = beginMrr > 0
+      ? Math.round(((beginMrr + expansionMrr + reactivationMrr - contractionMrr - churnedMrr) / beginMrr) * 100)
+      : 100;
+    const divisor    = contractionMrr + churnedMrr;
+    const quickRatio = divisor > 0
+      ? parseFloat(((newMrr + expansionMrr + reactivationMrr) / divisor).toFixed(2))
+      : null;
+
+    result.push({
+      month: label, beginMrr, newMrr, expansionMrr, contractionMrr,
+      churnedMrr, reactivationMrr, netNewMrr, endingMrr, nrr, quickRatio,
+    });
+  }
+
+  return result;
+};
+
+// ── getCashFlowForecast() ──────────────────────────────────────────────────
+/**
+ * Returns expected renewal revenue for each of the next 3 months,
+ * with individual renewal details and at-risk flags from active dunning records.
+ *
+ * @param {number} months  Months ahead to forecast (default 3)
+ * @returns {Array<{month, expectedMrr, renewalCount, atRiskMrr, renewals: []}>}
+ */
+const getCashFlowForecast = async (months = 3) => {
+  const now    = new Date();
+  const result = [];
+
+  // Fetch all active dunning tenant IDs for at-risk flagging
+  const dunningTenantIds = await DunningRecord.distinct('tenantId', { status: { $in: ['pending', 'retrying'] } });
+  const dunningSet       = new Set(dunningTenantIds.map(id => id.toString()));
+
+  for (let i = 0; i < months; i++) {
+    const ref        = i === 0 ? now : subMonths(now, -i);
+    const monthStart = startOfMonth(ref);
+    const monthEnd   = endOfMonth(ref);
+    const label      = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
+
+    const subs = await Subscription.aggregate([
+      {
+        $match: {
+          status:             { $in: ['active', 'trialing'] },
+          currentPeriodEnd:   { $gte: monthStart, $lte: monthEnd },
+        },
+      },
+      {
+        $lookup: {
+          from: 'planversions', localField: 'planVersionId',
+          foreignField: '_id', as: 'pv',
+        },
+      },
+      { $unwind: { path: '$pv', preserveNullAndEmpty: true } },
+      {
+        $lookup: {
+          from: 'tenants', localField: 'tenantId',
+          foreignField: '_id', as: 'tenant',
+        },
+      },
+      { $unwind: { path: '$tenant', preserveNullAndEmpty: true } },
+      {
+        $project: {
+          tenantId:        1,
+          tenantName:      '$tenant.name',
+          planName:        '$pv.displayName',
+          price:           '$pv.price',
+          interval:        '$pv.interval',
+          currentPeriodEnd:1,
+          monthlyPrice: {
+            $cond: [{ $eq: ['$pv.interval', 'annual'] }, { $divide: ['$pv.price', 12] }, '$pv.price'],
+          },
+        },
+      },
+    ]);
+
+    let expectedMrr  = 0;
+    let atRiskMrr    = 0;
+    const renewals   = [];
+
+    subs.forEach(s => {
+      const mp     = Math.round(s.monthlyPrice || 0);
+      const atRisk = dunningSet.has(s.tenantId.toString());
+      expectedMrr += mp;
+      if (atRisk) atRiskMrr += mp;
+      renewals.push({
+        tenantId:        s.tenantId,
+        tenantName:      s.tenantName || 'Unknown',
+        planName:        s.planName || 'Unknown',
+        amount:          mp,
+        renewalDate:     s.currentPeriodEnd,
+        atRisk,
+      });
+    });
+
+    result.push({
+      month:        label,
+      expectedMrr:  Math.round(expectedMrr),
+      renewalCount: subs.length,
+      atRiskMrr:    Math.round(atRiskMrr),
+      renewals:     renewals.sort((a, b) => new Date(a.renewalDate) - new Date(b.renewalDate)),
+    });
+  }
+
+  return result;
+};
+
+// ── getCohortRetention() ──────────────────────────────────────────────────
+/**
+ * Compute monthly cohort retention matrix.
+ * Each row = tenants who signed up in a given month (cohort).
+ * Each cell = % of that cohort still active at M+1, M+2, ... M+N months.
+ *
+ * @param {number} cohortMonths  Number of monthly cohorts to compute (default 6)
+ * @returns {Array<{cohort, cohortSize, retention: number[]}>}
+ */
+const getCohortRetention = async (cohortMonths = 6) => {
+  const now    = new Date();
+  const result = [];
+
+  for (let i = cohortMonths - 1; i >= 0; i--) {
+    const cohortRef   = subMonths(now, i);
+    const cohortStart = startOfMonth(cohortRef);
+    const cohortEnd   = endOfMonth(cohortRef);
+    const label       = `${cohortRef.getFullYear()}-${String(cohortRef.getMonth() + 1).padStart(2, '0')}`;
+
+    // Tenants who first subscribed in this cohort month
+    const cohortTenants = await Subscription.distinct('tenantId', {
+      createdAt: { $gte: cohortStart, $lte: cohortEnd },
+    });
+
+    if (cohortTenants.length === 0) {
+      result.push({ cohort: label, cohortSize: 0, retention: [] });
+      continue;
+    }
+
+    const cohortSize = cohortTenants.length;
+    const retention  = [];
+
+    // M+0 = 100% (the cohort month itself)
+    const monthsToCheck = i; // can only check months that have passed
+    for (let m = 0; m <= monthsToCheck; m++) {
+      const checkRef   = subMonths(now, i - m);
+      const checkStart = startOfMonth(checkRef);
+      const checkEnd   = endOfMonth(checkRef);
+
+      // Active in this check month = was active at any point during that month
+      const active = await Subscription.countDocuments({
+        tenantId:  { $in: cohortTenants },
+        status:    { $in: ['active', 'trialing'] },
+        createdAt: { $lte: checkEnd },
+        $or: [
+          { cancelledAt: null },
+          { cancelledAt: { $gt: checkStart } },
+        ],
+      });
+
+      retention.push(Math.round((active / cohortSize) * 100));
+    }
+
+    result.push({ cohort: label, cohortSize, retention });
+  }
+
+  return result;
 };

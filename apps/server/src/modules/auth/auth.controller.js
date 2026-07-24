@@ -141,4 +141,12 @@ const updateAvatar = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: result });
 });
 
-module.exports = { register, verifyEmail, login, refresh, logout, forgotPassword, resetPassword, getMe, updateMe, updateAvatar };
+/**
+ * POST /auth/me/change-password
+ */
+const changePassword = asyncHandler(async (req, res) => {
+  await authService.changePassword(req.user.id, req.body.currentPassword, req.body.newPassword);
+  res.status(200).json({ success: true, data: { message: 'Password changed successfully. Please log in again.' } });
+});
+
+module.exports = { register, verifyEmail, login, refresh, logout, forgotPassword, resetPassword, getMe, updateMe, updateAvatar, changePassword };

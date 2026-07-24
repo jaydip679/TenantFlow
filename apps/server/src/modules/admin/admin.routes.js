@@ -107,4 +107,22 @@ router.get('/invoices', ...adminAuth, validate(listInvoicesSchema), adminControl
  */
 router.get('/queues', ...adminAuth, adminController.getQueueStats);
 
+/**
+ * GET /metrics/mrr-movements?months=6
+ * MRR waterfall: New, Expansion, Contraction, Churned, Reactivation per month + NRR + Quick Ratio
+ */
+router.get('/metrics/mrr-movements', ...adminAuth, adminController.getMrrMovements);
+
+/**
+ * GET /metrics/cash-flow?months=3
+ * 90-day renewal calendar with expected MRR per month and at-risk flags
+ */
+router.get('/metrics/cash-flow', ...adminAuth, adminController.getCashFlowForecast);
+
+/**
+ * GET /metrics/cohort-retention?cohorts=6
+ * Monthly cohort retention heat-map matrix
+ */
+router.get('/metrics/cohort-retention', ...adminAuth, adminController.getCohortRetention);
+
 module.exports = router;

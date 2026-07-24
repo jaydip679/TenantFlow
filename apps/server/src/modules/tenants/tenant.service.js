@@ -250,7 +250,7 @@ const inviteMember = async (tenantId, email, role, actorUser, tenantContext) => 
 
   const tenant = await Tenant.findById(tenantId).select('name').lean();
 
-  const acceptUrl = `${process.env.CLIENT_URL}/accept-invite?token=${inviteToken}`;
+  const acceptUrl = `${process.env.CLIENT_URL}/accept-invite?token=${inviteToken}&tenantId=${tenantId}`;
 
   await enqueueEmail({
     type:        'member_invite',
@@ -409,12 +409,44 @@ const changeMemberRole = async (tenantId, targetUserId, newRole, actorUser) => {
   return await User.findById(targetUserId).select('-passwordHash -inviteToken').lean();
 };
 
+/**
+ * Validate an invite token (public — no auth required).
+ * Returns just enough context to render the accept-invite page.
+ *
+ * @param {string} token - UUID invite token from email link
+ * @returns {{ tenantId, tenantName, email, role }}
+ */
+const validateInviteToken = async (token) => {
+  const user = await User.findOne({
+    inviteToken: token,
+    status:      'invited',
+  }).lean();
+
+  if (!user) {
+    throw new AppError('This invite link is invalid or has already been used.', 404, ERROR_CODES.NOT_FOUND);
+  }
+
+  if (user.inviteExpiresAt && new Date(user.inviteExpiresAt) < new Date()) {
+    throw new AppError('This invite link has expired. Please ask the admin to resend your invitation.', 410, ERROR_CODES.INVITE_TOKEN_INVALID);
+  }
+
+  const tenant = await Tenant.findById(user.tenantId).select('name').lean();
+
+  return {
+    tenantId:   user.tenantId.toString(),
+    tenantName: tenant?.name || 'Your organization',
+    email:      user.email,
+    role:       user.role,
+  };
+};
+
 module.exports = {
   getTenant,
   updateTenant,
   uploadLogo,
   getMembers,
   inviteMember,
+  validateInviteToken,
   acceptInvite,
   removeMember,
   changeMemberRole,
