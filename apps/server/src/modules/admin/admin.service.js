@@ -523,18 +523,6 @@ const getQueueStats = async () => {
   return stats;
 };
 
-module.exports = {
-  getPlatformMetrics,
-  listTenants,
-  getTenantDetail,
-  forceStatusChange,
-  listAllInvoices,
-  getActiveDunningRecords,
-  getQueueStats,
-  getMrrMovements,
-  getCashFlowForecast,
-  getCohortRetention,
-};
 
 // ── getMrrMovements() ──────────────────────────────────────────────────────
 /**
@@ -851,4 +839,17 @@ const getCohortRetention = async (cohortMonths = 6) => {
   }
 
   return result;
+};
+
+module.exports = {
+  getPlatformMetrics,
+  listTenants,
+  getTenantDetail,
+  forceStatusChange,
+  listAllInvoices,
+  getActiveDunningRecords,
+  getQueueStats,
+  getMrrMovements,
+  getCashFlowForecast,
+  getCohortRetention,
 };

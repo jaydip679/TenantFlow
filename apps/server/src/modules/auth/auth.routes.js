@@ -14,8 +14,9 @@
  * REF: docs/MASTER_AGENT_PROMPT.md §9.2 — Route Organization Rules
  */
 
-const express = require('express');
+const express      = require('express');
 const cookieParser = require('cookie-parser');
+const Joi          = require('joi');
 
 const authController         = require('./auth.controller');
 const { authenticate }       = require('../../shared/middleware/authenticate.middleware');

@@ -101,6 +101,46 @@ const register = async ({ email, password, firstName, lastName, companyName }) =
   // Pre-check for duplicate email (fast fail before starting transaction)
   const existing = await User.findOne({ email: normalizedEmail });
   if (existing) {
+    // If the account exists but is NOT yet verified, update it with the latest
+    // submitted data (name, password, company name) and resend a fresh OTP.
+    // This handles: OTP expired, typo in name, caps mistake, wrong inbox, etc.
+    // The user's LATEST attempt is always what ends up verified.
+    if (!existing.isEmailVerified) {
+      const newPasswordHash  = await bcrypt.hash(password, BCRYPT_COST);
+      const newFirstName     = firstName.trim();
+      const newLastName      = lastName.trim();
+
+      // Update user with the latest submitted profile data + new password
+      await User.findByIdAndUpdate(existing._id, {
+        firstName:    newFirstName,
+        lastName:     newLastName,
+        passwordHash: newPasswordHash,
+      });
+
+      // Update tenant company name with the latest submitted value
+      if (existing.tenantId) {
+        await Tenant.findByIdAndUpdate(existing.tenantId, {
+          name: companyName.trim(),
+        });
+      }
+
+      // Generate and send a fresh OTP
+      const otp = generateOTP();
+      await storeOTP(OTP_PURPOSES.EMAIL_VERIFY, normalizedEmail, otp);
+      await enqueueEmail({
+        type:             'email_otp',
+        to:               normalizedEmail,
+        firstName:        newFirstName,
+        otp,
+        expiresInMinutes: 10,
+      });
+
+      logger.info({ email: normalizedEmail }, 'Updated unverified account and re-sent OTP');
+      // Return same shape as a fresh registration — frontend behaviour is identical
+      return { userId: String(existing._id), tenantId: String(existing.tenantId) };
+    }
+
+    // Account is fully verified — this is a real duplicate
     throw new AppError(
       'An account with this email already exists.',
       409,

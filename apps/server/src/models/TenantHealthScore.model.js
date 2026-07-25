@@ -75,7 +75,7 @@ const healthScoreSchema = new Schema(
 
 // Sorted by worst health first for admin alert views
 healthScoreSchema.index({ score: 1 });
-healthScoreSchema.index({ tenantId: 1 }, { unique: true });
+// Note: tenantId unique index is declared via `unique: true` on the field — no schema.index() needed.
 
 const TenantHealthScore = mongoose.model('TenantHealthScore', healthScoreSchema);
 
