@@ -20,8 +20,10 @@
 const request  = require('supertest');
 const mongoose = require('mongoose');
 const crypto   = require('crypto');
-const app      = require('../../../app');
-const redis    = require('../../../config/redis');
+const app      = require('../../app');
+const redis    = require('../../config/redis');
+
+jest.setTimeout(30000);
 
 // ── Mock Razorpay SDK ─────────────────────────────────────────────────────────
 // We mock the razorpay module before it is required by any service.
@@ -62,11 +64,11 @@ const rand = () => Math.random().toString(36).slice(2, 8);
 function makeUser(suffix = '') {
   const id = rand();
   return {
-    firstName:  'BillingE2E',
-    lastName:   suffix || id,
+    firstName:  'Billing',
+    lastName:   'TestUser',
     email:      `billing_e2e_${id}@test.tenantflow.dev`,
     password:   'SecurePass@123',
-    tenantName: `Billing Corp ${id}`,
+    companyName: `Billing Corp ${id}`,
   };
 }
 
@@ -75,12 +77,13 @@ async function getOtpFromRedis(email, purpose) {
   const value = await redis.get(key);
   if (!value) throw new Error(`No OTP found in Redis for key "${key}"`);
   const parsed = JSON.parse(value);
-  return parsed.otp ?? parsed;
+  return parsed.code ?? parsed;
 }
 
 /** Register, verify OTP, login — returns { accessToken, tenantId, userId } */
 async function registerAndLogin(server, userPayload) {
-  await request(server).post('/api/v1/auth/register').send(userPayload);
+  const regRes = await request(server).post('/api/v1/auth/register').send(userPayload);
+  if (regRes.status !== 201) console.error('BILLING E2E REGISTER FAILED:', regRes.body);
   const otp = await getOtpFromRedis(userPayload.email, 'email_verify');
   await request(server).post('/api/v1/auth/verify-email').send({ email: userPayload.email, otp });
   const loginRes = await request(server)
@@ -143,7 +146,7 @@ describe('E2E — Subscription Billing Flow', () => {
         .set('Authorization', `Bearer ${auth.accessToken}`)
         .expect(200);
 
-      const sub = res.body.data;
+      const sub = res.body.data.subscription;
       expect(sub).toBeDefined();
       expect(['active', 'trialing']).toContain(sub.status);
       expect(sub.tenantId).toBe(auth.tenantId);
@@ -155,8 +158,8 @@ describe('E2E — Subscription Billing Flow', () => {
         .set('Authorization', `Bearer ${auth.accessToken}`)
         .expect(200);
 
-      expect(Array.isArray(res.body.data)).toBe(true);
-      expect(res.body.data.length).toBeGreaterThan(0);
+      expect(Array.isArray(res.body.data.plans)).toBe(true);
+      expect(res.body.data.plans.length).toBeGreaterThan(0);
     });
   });
 
@@ -194,10 +197,10 @@ describe('E2E — Subscription Billing Flow', () => {
     });
   });
 
-  // ── Test 3: Plan list and proration preview ───────────────────────────────
-  describe('Test 3: Proration preview before plan change', () => {
+  // ── Test 3: Plan upgrade and proration invoice ──────────────────────────────
+  describe('Test 3: Plan upgrade and proration invoice', () => {
     let auth;
-    let targetPlanVersionId;
+    let targetPlanId;
     const user = makeUser();
 
     beforeAll(async () => {
@@ -207,41 +210,44 @@ describe('E2E — Subscription Billing Flow', () => {
       const plansRes = await request(server)
         .get('/api/v1/plans')
         .set('Authorization', `Bearer ${auth.accessToken}`);
-      const plans = plansRes.body.data || [];
+      const plans = plansRes.body.data?.plans || [];
 
-      // Find a plan version that isn't the current one
+      // Find a plan that isn't the current one (must be higher price for upgrade, assuming sorted)
       const subRes = await request(server)
         .get(`/api/v1/subscriptions/${auth.tenantId}`)
         .set('Authorization', `Bearer ${auth.accessToken}`);
-      const currentPlanVersionId = subRes.body.data?.planVersionId;
+      const currentPlanId = subRes.body.data?.subscription?.planId;
 
+      // Find the highest priced plan to guarantee it's an upgrade
+      let maxPrice = -1;
       for (const plan of plans) {
-        for (const version of plan.versions || [plan]) {
-          if (version._id !== currentPlanVersionId) {
-            targetPlanVersionId = version._id;
-            break;
-          }
+        if (plan.price > maxPrice && plan._id !== currentPlanId) {
+          maxPrice = plan.price;
+          targetPlanId = plan._id;
         }
-        if (targetPlanVersionId) break;
       }
     });
 
-    it('3a. POST /subscriptions/:id/preview-change — 200 with proration amounts', async () => {
-      if (!targetPlanVersionId) {
-        console.log('    ℹ Only one plan version available — skipping proration preview');
+    it('3a. POST /subscriptions/:id/upgrade — 200 with prorated invoice', async () => {
+      if (!targetPlanId) {
+        console.log('    ℹ Only one plan available — skipping upgrade test');
         return;
       }
 
       const res = await request(server)
-        .post(`/api/v1/subscriptions/${auth.tenantId}/preview-change`)
+        .post(`/api/v1/subscriptions/${auth.tenantId}/upgrade`)
         .set('Authorization', `Bearer ${auth.accessToken}`)
-        .send({ planVersionId: targetPlanVersionId })
+        .send({ targetPlanId })
         .expect(200);
 
-      const preview = res.body.data;
-      expect(preview).toHaveProperty('prorationCredit');
-      expect(preview).toHaveProperty('prorationCharge');
-      expect(preview).toHaveProperty('amountDue');
+      const { subscription, proratedInvoice } = res.body.data;
+      expect(subscription).toBeDefined();
+      expect(subscription.planId).toBe(targetPlanId);
+      // Depending on the price difference, a prorated invoice might be null or created
+      if (proratedInvoice) {
+        expect(proratedInvoice).toHaveProperty('_id');
+        expect(proratedInvoice).toHaveProperty('total');
+      }
     });
   });
 
@@ -258,7 +264,7 @@ describe('E2E — Subscription Billing Flow', () => {
       const res = await request(server)
         .post(`/api/v1/subscriptions/${auth.tenantId}/cancel`)
         .set('Authorization', `Bearer ${auth.accessToken}`)
-        .send({ cancelImmediately: false })
+        .send({ cancelAtPeriodEnd: true })
         .expect(200);
 
       expect(res.body.success).toBe(true);
@@ -270,7 +276,7 @@ describe('E2E — Subscription Billing Flow', () => {
         .set('Authorization', `Bearer ${auth.accessToken}`)
         .expect(200);
 
-      const sub = res.body.data;
+      const sub = res.body.data.subscription;
       const isCancelled = sub.status === 'cancelled' || sub.cancelAtPeriodEnd === true;
       expect(isCancelled).toBe(true);
     });

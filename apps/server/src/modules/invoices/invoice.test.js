@@ -25,8 +25,7 @@
 // ── Mocks ─────────────────────────────────────────────────────
 jest.mock('../../models/Invoice.model');
 jest.mock('../../models/Subscription.model');
-jest.mock('../../models/PlanVersion.model');
-jest.mock('../../models/Tenant.model');
+jest.mock('../../shared/facades/identity.facade');
 jest.mock('../../config/redis', () => ({
   set: jest.fn(),
   del: jest.fn().mockResolvedValue(1),
@@ -40,8 +39,7 @@ jest.mock('../../queues/pdf.queue', () => ({ enqueuePdfGeneration: jest.fn().moc
 
 const Invoice      = require('../../models/Invoice.model');
 const Subscription = require('../../models/Subscription.model');
-const PlanVersion  = require('../../models/PlanVersion.model');
-const Tenant       = require('../../models/Tenant.model');
+const identityFacade = require('../../shared/facades/identity.facade');
 const redisClient  = require('../../config/redis');
 const {
   buildRenewalLineItems,
@@ -207,7 +205,7 @@ describe('invoiceService.generateInvoice()', () => {
     Subscription.findById = jest.fn().mockResolvedValue(sub);
     Invoice.findOne  = jest.fn().mockResolvedValue(null); // No duplicate
 
-    PlanVersion.findById = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(makePlanVersion()) });
+    identityFacade.getPlanVersion = jest.fn().mockResolvedValue(makePlanVersion());
 
     const createdInvoice = makeInvoice();
     Invoice.create = jest.fn().mockResolvedValue(createdInvoice);

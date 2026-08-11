@@ -28,7 +28,6 @@ const { asyncHandler } = require('../utils/asyncHandler');
 
 // Lazy requires to avoid circular deps at load time
 const getTenant       = () => require('../../models/Tenant.model');
-const getSubscription = () => require('../../models/Subscription.model');
 const getUser         = () => require('../../models/User.model');
 
 const CACHE_TTL = 300; // 5 minutes
@@ -74,15 +73,10 @@ const tenantScope = (options = {}) =>
     } else {
       // 4. Cache miss — parallel DB queries
       const Tenant       = getTenant();
-      const Subscription = getSubscription();
       const User         = getUser();
 
-      const [tenant, subscription, usedSeats] = await Promise.all([
+      const [tenant, usedSeats] = await Promise.all([
         Tenant.findById(tenantId).select('status currentPlanId features').lean(),
-        Subscription.findOne({
-          tenantId,
-          status: { $nin: ['cancelled'] },
-        }).lean(),
         User.countDocuments({
           tenantId,
           status: { $in: ['active', 'invited'] },
@@ -110,8 +104,6 @@ const tenantScope = (options = {}) =>
       req.tenantContext = {
         tenantId,
         status:             tenant.status,
-        planId:             subscription?.planId?.toString()   || null,
-        subscriptionStatus: subscription?.status               || null,
         // seatLimit = the plan's max allowed seats (from tenant.features, set when plan is assigned/upgraded)
         // seatCount on the subscription = USED seats — must NOT be used as the limit
         seatLimit:          featuresObj?.max_seats ?? 0,

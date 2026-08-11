@@ -42,7 +42,7 @@
 jest.mock('../../models/DunningRecord.model');
 jest.mock('../../models/Invoice.model');
 jest.mock('../../models/Subscription.model');
-jest.mock('../../models/Tenant.model');
+jest.mock('../../shared/facades/identity.facade');
 jest.mock('../../config/redis', () => ({
   set: jest.fn().mockResolvedValue('OK'),
   del: jest.fn().mockResolvedValue(1),
@@ -54,14 +54,27 @@ jest.mock('../../queues/dunning.queue', () => ({
 }));
 jest.mock('../../queues/email.queue', () => ({ enqueueEmail: jest.fn().mockResolvedValue({}) }));
 jest.mock('../../shared/utils/auditLogService', () => ({ createAuditLog: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('../../shared/events/outbox.helper', () => ({ addEventToOutbox: jest.fn().mockResolvedValue({}) }));
 jest.mock('../../config/razorpay', () => ({
   orders: { create: jest.fn().mockResolvedValue({ id: 'order_dunning_test' }) },
 }));
+jest.mock('mongoose', () => {
+  const actual = jest.requireActual('mongoose');
+  return {
+    ...actual,
+    startSession: jest.fn().mockResolvedValue({
+      withTransaction: jest.fn().mockImplementation(async (cb) => {
+        await cb();
+      }),
+      endSession: jest.fn(),
+    }),
+  };
+});
 
 const DunningRecord = require('../../models/DunningRecord.model');
 const Invoice       = require('../../models/Invoice.model');
 const Subscription  = require('../../models/Subscription.model');
-const Tenant        = require('../../models/Tenant.model');
+const identityFacade = require('../../shared/facades/identity.facade');
 const redisClient   = require('../../config/redis');
 const { enqueueDunningStep } = require('../../queues/dunning.queue');
 const dunningService = require('./dunning.service');
@@ -116,13 +129,14 @@ beforeEach(() => jest.clearAllMocks());
 // ── initiateDunning() ─────────────────────────────────────────
 describe('dunningService.initiateDunning()', () => {
   it('creates DunningRecord at step 0 when none exists', async () => {
-    DunningRecord.findOne   = jest.fn().mockResolvedValue(null); // No existing
-    DunningRecord.create    = jest.fn().mockResolvedValue(makeDunning());
+    DunningRecord.findOne   = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue(null) });
+    DunningRecord.create    = jest.fn().mockReturnValue([makeDunning()]);
 
     const result = await dunningService.initiateDunning('tenant-id-1', 'sub-id-1', 'inv-id-1');
 
     expect(DunningRecord.create).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: 'tenant-id-1', subscriptionId: 'sub-id-1', invoiceId: 'inv-id-1', currentStep: 0, status: 'active' })
+      [expect.objectContaining({ tenantId: 'tenant-id-1', subscriptionId: 'sub-id-1', invoiceId: 'inv-id-1', currentStep: 0, status: 'active' })],
+      expect.objectContaining({ session: null })
     );
     expect(enqueueDunningStep).toHaveBeenCalledWith('dn-id-1');
     expect(result).toBeDefined();
@@ -130,7 +144,7 @@ describe('dunningService.initiateDunning()', () => {
 
   it('returns existing active record without creating a new one (idempotent)', async () => {
     const existing = makeDunning();
-    DunningRecord.findOne = jest.fn().mockResolvedValue(existing);
+    DunningRecord.findOne = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue(existing) });
 
     const result = await dunningService.initiateDunning('tenant-id-1', 'sub-id-1', 'inv-id-1');
 
@@ -175,7 +189,7 @@ describe('dunningService.advanceDunningStep()', () => {
     DunningRecord.findById = jest.fn().mockResolvedValue(dunning);
     Invoice.findById       = jest.fn().mockResolvedValue(makeInvoice());
     Subscription.findById  = jest.fn().mockResolvedValue(makeSub());
-    Tenant.findById        = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(makeTenant()) });
+    identityFacade.getTenantBillingProfile = jest.fn().mockResolvedValue(makeTenant());
 
     await dunningService.advanceDunningStep('dn-id-1');
 
@@ -200,7 +214,7 @@ describe('dunningService.advanceDunningStep()', () => {
     DunningRecord.findById = jest.fn().mockResolvedValue(dunning);
     Invoice.findById       = jest.fn().mockResolvedValue(makeInvoice());
     Subscription.findById  = jest.fn().mockResolvedValue(sub);
-    Tenant.findById        = jest.fn().mockReturnValue({ select: jest.fn().mockResolvedValue(makeTenant()) });
+    identityFacade.getTenantBillingProfile = jest.fn().mockResolvedValue(makeTenant());
 
     await dunningService.advanceDunningStep('dn-id-1');
 
@@ -211,27 +225,28 @@ describe('dunningService.advanceDunningStep()', () => {
 
 // ── resolveDunning() ─────────────────────────────────────────
 describe('dunningService.resolveDunning()', () => {
-  it('resolves dunning, restores subscription and tenant to active', async () => {
+  it('resolves dunning record and restores subscription and tenant status', async () => {
     const dunning = makeDunning();
-    DunningRecord.findById          = jest.fn().mockResolvedValue(dunning);
-    Subscription.findByIdAndUpdate  = jest.fn().mockResolvedValue(null);
-    Tenant.findByIdAndUpdate        = jest.fn().mockResolvedValue(null);
+    DunningRecord.findById = jest.fn().mockReturnValue({
+      session: jest.fn().mockResolvedValue(dunning),
+    });
+    Subscription.findByIdAndUpdate = jest.fn().mockReturnValue({
+      session: jest.fn().mockResolvedValue(null),
+    });
+    identityFacade.updateTenantStatus = jest.fn().mockResolvedValue(null);
 
     await dunningService.resolveDunning('dn-id-1', 'pay_test');
 
     expect(dunning.status).toBe('resolved');
     expect(dunning.resolvedAt).toBeInstanceOf(Date);
     expect(Subscription.findByIdAndUpdate).toHaveBeenCalledWith(
-      dunning.subscriptionId, { status: 'active' }
-    );
-    expect(Tenant.findByIdAndUpdate).toHaveBeenCalledWith(
-      dunning.tenantId, { status: 'active' }
+      dunning.subscriptionId, { status: 'active' }, { session: null }
     );
   });
 
   it('is idempotent — does nothing when already resolved', async () => {
     const dunning = makeDunning({ status: 'resolved' });
-    DunningRecord.findById = jest.fn().mockResolvedValue(dunning);
+    DunningRecord.findById = jest.fn().mockReturnValue({ session: jest.fn().mockResolvedValue(dunning) });
 
     await dunningService.resolveDunning('dn-id-1');
 
@@ -244,24 +259,26 @@ describe('dunningService.resolveDunning()', () => {
 describe('dunningService.abandonDunning()', () => {
   it('suspends tenant and marks invoice uncollectible on abandonment', async () => {
     const dunning = makeDunning();
-    DunningRecord.findById         = jest.fn().mockResolvedValue(dunning);
-    Subscription.findByIdAndUpdate = jest.fn().mockResolvedValue(null);
-    Tenant.findByIdAndUpdate       = jest.fn().mockResolvedValue(null);
-    Invoice.findByIdAndUpdate      = jest.fn().mockResolvedValue(null);
-    Tenant.findById                = jest.fn().mockReturnValue({ select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(makeTenant()) }) });
+    DunningRecord.findById = jest.fn().mockReturnValue({
+      session: jest.fn().mockResolvedValue(dunning),
+    });
+    Subscription.findByIdAndUpdate = jest.fn().mockReturnValue({
+      session: jest.fn().mockResolvedValue(null),
+    });
+    Invoice.findByIdAndUpdate = jest.fn().mockReturnValue({
+      session: jest.fn().mockResolvedValue(null),
+    });
+    identityFacade.getTenantBillingProfile = jest.fn().mockResolvedValue(makeTenant());
 
     await dunningService.abandonDunning('dn-id-1');
 
     expect(dunning.status).toBe('abandoned');
     expect(dunning.abandonedAt).toBeInstanceOf(Date);
     expect(Subscription.findByIdAndUpdate).toHaveBeenCalledWith(
-      dunning.subscriptionId, { status: 'suspended' }
-    );
-    expect(Tenant.findByIdAndUpdate).toHaveBeenCalledWith(
-      dunning.tenantId, { status: 'suspended' }
+      dunning.subscriptionId, { status: 'suspended' }, { session: expect.anything() }
     );
     expect(Invoice.findByIdAndUpdate).toHaveBeenCalledWith(
-      dunning.invoiceId, { status: 'uncollectible' }
+      dunning.invoiceId, { status: 'uncollectible' }, { session: expect.anything() }
     );
   });
 });

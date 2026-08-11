@@ -26,8 +26,7 @@
 const mongoose  = require('mongoose');
 const Invoice   = require('../../models/Invoice.model');
 const Subscription   = require('../../models/Subscription.model');
-const PlanVersion    = require('../../models/PlanVersion.model');
-const Tenant         = require('../../models/Tenant.model');
+const identityFacade = require('../../shared/facades/identity.facade');
 const { AppError }   = require('../../shared/errors/AppError');
 const { ERROR_CODES }       = require('../../shared/errors/errorCodes');
 const { generateInvoiceNumber } = require('../../shared/utils/invoiceNumber');
@@ -152,13 +151,13 @@ const generateInvoice = async (subscriptionId, triggerReason, upgradeContext = n
     if (triggerReason === 'upgrade' && upgradeContext) {
       const { oldPlanVersionId, newPlanVersionId, proration } = upgradeContext;
       const [oldPV, newPV] = await Promise.all([
-        PlanVersion.findById(oldPlanVersionId).lean(),
-        PlanVersion.findById(newPlanVersionId).lean(),
+        identityFacade.getPlanVersion(oldPlanVersionId),
+        identityFacade.getPlanVersion(newPlanVersionId),
       ]);
       lineItems = buildUpgradeLineItems(oldPV, newPV, proration);
     } else {
       // renewal (default) or manual
-      const planVersion = await PlanVersion.findById(subscription.planVersionId).lean();
+      const planVersion = await identityFacade.getPlanVersion(subscription.planVersionId);
       lineItems = buildRenewalLineItems(subscription, planVersion);
     }
 
@@ -240,7 +239,7 @@ const generatePdf = async (invoiceId) => {
   if (!invoice) throw new AppError('Invoice not found.', 404, ERROR_CODES.INVOICE_NOT_FOUND);
 
   const [tenant, subscription] = await Promise.all([
-    Tenant.findById(invoice.tenantId).lean(),
+    identityFacade.getTenantBillingProfile(invoice.tenantId),
     Subscription.findById(invoice.subscriptionId).lean(),
   ]);
 
@@ -460,10 +459,17 @@ const listAllInvoices = async (filters = {}, options = {}) => {
       .sort({ createdAt: sortOrder })
       .skip(skip)
       .limit(limit)
-      .populate('tenantId', 'name slug')
       .lean(),
     Invoice.countDocuments(query),
   ]);
+
+  // Avoid N+1 by bulk fetching tenants
+  const tenantIds = [...new Set(invoices.map((inv) => inv.tenantId.toString()))];
+  const tenantProfiles = await identityFacade.getTenantProfiles(tenantIds);
+  
+  invoices.forEach((inv) => {
+    inv.tenantId = tenantProfiles[inv.tenantId.toString()] || null;
+  });
 
   return { invoices, pagination: paginationMeta(total, page, limit) };
 };

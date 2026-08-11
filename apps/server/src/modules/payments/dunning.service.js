@@ -29,13 +29,14 @@ const { addDays } = require('date-fns');
 const DunningRecord      = require('../../models/DunningRecord.model');
 const Invoice            = require('../../models/Invoice.model');
 const Subscription       = require('../../models/Subscription.model');
-const Tenant             = require('../../models/Tenant.model');
+const identityFacade     = require('../../shared/facades/identity.facade');
 const { AppError }       = require('../../shared/errors/AppError');
 const { ERROR_CODES }    = require('../../shared/errors/errorCodes');
 const { createAuditLog } = require('../../shared/utils/auditLogService');
 const { enqueueEmail }   = require('../../queues/email.queue');
 const { enqueueDunningStep } = require('../../queues/dunning.queue');
 const redisClient        = require('../../config/redis');
+const { addEventToOutbox }    = require('../../shared/events/outbox.helper');
 const logger             = require('../../shared/utils/logger');
 
 // ── Constants ─────────────────────────────────────────────────
@@ -66,11 +67,12 @@ const invalidateCache = async (tenantId) => {
  * @param {string} tenantId
  * @param {string} subscriptionId
  * @param {string} invoiceId
+ * @param {import('mongoose').ClientSession} [session]
  * @returns {Promise<DunningRecord>}
  */
-const initiateDunning = async (tenantId, subscriptionId, invoiceId) => {
+const initiateDunning = async (tenantId, subscriptionId, invoiceId, session = null) => {
   // Idempotency: check for existing active dunning record
-  const existing = await DunningRecord.findOne({ invoiceId, status: 'active' });
+  const existing = await DunningRecord.findOne({ invoiceId, status: 'active' }).session(session);
   if (existing) {
     logger.info({ invoiceId, dunningId: existing._id }, 'Active DunningRecord already exists — skipping initiation');
     return existing;
@@ -80,7 +82,7 @@ const initiateDunning = async (tenantId, subscriptionId, invoiceId) => {
   const now         = new Date();
   const nextRetryAt = new Date(now.getTime() + 60 * 60 * 1000);  // +1 hour
 
-  const dunningRecord = await DunningRecord.create({
+  const [dunningRecord] = await DunningRecord.create([{
     tenantId,
     subscriptionId,
     invoiceId,
@@ -94,11 +96,26 @@ const initiateDunning = async (tenantId, subscriptionId, invoiceId) => {
         outcome:     'pending',
       },
     ],
-  });
+  }], { session });
+
+  if (session) {
+    await addEventToOutbox({
+      eventType: 'dunning.started',
+      aggregateType: 'dunning',
+      aggregateId: dunningRecord._id.toString(),
+      tenantId: tenantId.toString(),
+      payload: {
+        dunningRecordId: dunningRecord._id.toString(),
+        invoiceId: invoiceId.toString(),
+        subscriptionId: subscriptionId.toString(),
+      },
+      session,
+    });
+  }
 
   logger.info({ dunningId: dunningRecord._id, tenantId, invoiceId }, 'DunningRecord created at step 0');
 
-  // Enqueue immediate step 0 processing
+  // Enqueue immediate step 0 processing (idempotent, safe outside transaction commit block conceptually)
   await enqueueDunningStep(dunningRecord._id.toString());
 
   return dunningRecord;
@@ -142,7 +159,7 @@ const advanceDunningStep = async (dunningRecordId) => {
     const currentStep = dunningRecord.currentStep;
     const invoice     = await Invoice.findById(dunningRecord.invoiceId);
     const subscription = await Subscription.findById(dunningRecord.subscriptionId);
-    const tenant      = await Tenant.findById(dunningRecord.tenantId).select('billingEmail name razorpayCustomerId status');
+    const tenant      = await identityFacade.getTenantBillingProfile(dunningRecord.tenantId);
 
     logger.info({ dunningRecordId, currentStep, tenantId: dunningRecord.tenantId }, 'Attempting dunning step');
 
@@ -216,20 +233,27 @@ const advanceDunningStep = async (dunningRecordId) => {
           outcome:     'pending',
         });
 
-        // Step 2: mark subscription as past_due
-        if (nextStep === 2 && subscription && subscription.status !== 'past_due') {
-          subscription.status = 'past_due';
-          await subscription.save();
+        const mongoose = require('mongoose');
+        const session = await mongoose.startSession();
+        try {
+          await session.withTransaction(async () => {
+            if (nextStep === 2 && subscription && subscription.status !== 'past_due') {
+              subscription.status = 'past_due';
+              await subscription.save({ session });
 
-          logger.info(
-            { subscriptionId: subscription._id, dunningRecordId },
-            'Subscription marked past_due at dunning step 2'
-          );
+              logger.info(
+                { subscriptionId: subscription._id, dunningRecordId },
+                'Subscription marked past_due at dunning step 2'
+              );
+              
+              // Note: tenant cache invalidation removed from sync flow, handled eventually
+            }
 
-          await invalidateCache(dunningRecord.tenantId.toString());
+            await dunningRecord.save({ session });
+          });
+        } finally {
+          session.endSession();
         }
-
-        await dunningRecord.save();
 
         logger.info({ dunningRecordId, nextStep, nextSchedule }, 'Dunning advanced to next step');
 
@@ -262,7 +286,6 @@ const advanceDunningStep = async (dunningRecordId) => {
 
       } else {
         // currentStep === 3 and failed → ABANDON
-        await dunningRecord.save();
         await abandonDunning(dunningRecord._id.toString());
       }
     }
@@ -280,22 +303,24 @@ const advanceDunningStep = async (dunningRecordId) => {
  * Restores subscription + tenant to 'active'.
  *
  * @param {string} dunningRecordId
+ * @param {string} dunningRecordId
  * @param {string} [paymentTransactionId]
+ * @param {import('mongoose').ClientSession} [session]
  */
-const resolveDunning = async (dunningRecordId, paymentTransactionId = null) => {
-  const dunningRecord = await DunningRecord.findById(dunningRecordId);
+const resolveDunning = async (dunningRecordId, paymentTransactionId = null, session = null) => {
+  const dunningRecord = await DunningRecord.findById(dunningRecordId).session(session);
   if (!dunningRecord || dunningRecord.status === 'resolved') return;
 
   dunningRecord.status     = 'resolved';
   dunningRecord.resolvedAt = new Date();
-  await dunningRecord.save();
+  await dunningRecord.save({ session });
 
-  // Restore subscription + tenant to active
-  await Promise.all([
-    Subscription.findByIdAndUpdate(dunningRecord.subscriptionId, { status: 'active' }),
-    Tenant.findByIdAndUpdate(dunningRecord.tenantId, { status: 'active' }),
-    invalidateCache(dunningRecord.tenantId.toString()),
-  ]);
+  // Restore subscription to active (Tenant restored async via invoice.paid)
+  if (dunningRecord.subscriptionId) {
+    await Subscription.findByIdAndUpdate(dunningRecord.subscriptionId, { status: 'active' }, { session });
+  }
+
+  // Identity Tenant update removed, handled by event consumer if needed.
 
   await createAuditLog({
     event:        'dunning.resolved',
@@ -327,20 +352,47 @@ const resolveDunning = async (dunningRecordId, paymentTransactionId = null) => {
  * @param {string} dunningRecordId
  */
 const abandonDunning = async (dunningRecordId) => {
-  const dunningRecord = await DunningRecord.findById(dunningRecordId);
-  if (!dunningRecord || dunningRecord.status !== 'active') return;
+  const mongoose = require('mongoose');
+  const session = await mongoose.startSession();
+  let dunningRecord;
+  try {
+    await session.withTransaction(async () => {
+      dunningRecord = await DunningRecord.findById(dunningRecordId).session(session);
+      if (!dunningRecord || dunningRecord.status !== 'active') return;
 
-  dunningRecord.status      = 'abandoned';
-  dunningRecord.abandonedAt = new Date();
-  await dunningRecord.save();
+      dunningRecord.status      = 'abandoned';
+      dunningRecord.abandonedAt = new Date();
+      
+      const stepRecord = dunningRecord.steps.find((s) => s.step === 3);
+      if (stepRecord) {
+        stepRecord.outcome = 'failed';
+      }
+      
+      await dunningRecord.save({ session });
 
-  // Suspend subscription, tenant, mark invoice uncollectible
-  await Promise.all([
-    Subscription.findByIdAndUpdate(dunningRecord.subscriptionId, { status: 'suspended' }),
-    Tenant.findByIdAndUpdate(dunningRecord.tenantId, { status: 'suspended' }),
-    Invoice.findByIdAndUpdate(dunningRecord.invoiceId, { status: 'uncollectible' }),
-    invalidateCache(dunningRecord.tenantId.toString()),
-  ]);
+      // Suspend subscription, mark invoice uncollectible
+      await Promise.all([
+        Subscription.findByIdAndUpdate(dunningRecord.subscriptionId, { status: 'suspended' }, { session }),
+        Invoice.findByIdAndUpdate(dunningRecord.invoiceId, { status: 'uncollectible' }, { session }),
+      ]);
+
+      await addEventToOutbox({
+        eventType: 'dunning.abandoned',
+        aggregateType: 'dunning',
+        aggregateId: dunningRecord._id.toString(),
+        tenantId: dunningRecord.tenantId.toString(),
+        payload: {
+          dunningRecordId: dunningRecord._id.toString(),
+          invoiceId: dunningRecord.invoiceId.toString(),
+        },
+        session,
+      });
+    });
+  } finally {
+    session.endSession();
+  }
+
+  if (!dunningRecord || dunningRecord.status !== 'abandoned') return;
 
   await createAuditLog({
     event:        'dunning.abandoned',
@@ -354,7 +406,7 @@ const abandonDunning = async (dunningRecordId) => {
 
   // Enqueue account suspension email
   try {
-    const tenant = await Tenant.findById(dunningRecord.tenantId).select('billingEmail name').lean();
+    const tenant = await identityFacade.getTenantBillingProfile(dunningRecord.tenantId);
     if (tenant?.billingEmail) {
       await enqueueEmail({
         type:      'account_suspended',

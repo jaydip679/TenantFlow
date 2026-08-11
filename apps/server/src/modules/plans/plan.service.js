@@ -125,12 +125,9 @@ const archivePlan = async (planId, actor) => {
   if (!plan) throw new AppError('Plan not found.', 404, ERROR_CODES.NOT_FOUND);
   if (!plan.isActive) throw new AppError('Plan is already archived.', 409, ERROR_CODES.PLAN_ARCHIVED);
 
-  // Check for active subscriptions — must lazy-require to avoid circular deps
-  const Subscription = require('../../models/Subscription.model');
-  const activeSubCount = await Subscription.countDocuments({
-    planId,
-    status: { $in: ['trialing', 'active', 'past_due', 'pending_downgrade'] },
-  });
+  // Check for active subscriptions via Billing Facade
+  const billingFacade = require('../../shared/facades/billing.facade');
+  const activeSubCount = await billingFacade.getActiveSubscriptionCountByPlan(planId);
 
   if (activeSubCount > 0) {
     throw new AppError(

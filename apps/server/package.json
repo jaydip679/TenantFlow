@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "jest --runInBand --forceExit",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "jest --runInBand --forceExit --setupFiles dotenv/config --testPathIgnorePatterns=\"\\.e2e\\.test\\.js$\"",
+    "test:e2e": "jest --runInBand --forceExit --setupFiles dotenv/config --testMatch=\"**/*.e2e.test.js\"",
     "test:watch": "jest --watch --runInBand",
     "test:coverage": "jest --coverage --runInBand --forceExit",
     "lint": "eslint src/ --ext .js"

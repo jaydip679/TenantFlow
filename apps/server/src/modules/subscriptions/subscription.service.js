@@ -19,14 +19,12 @@
  */
 
 const mongoose       = require('mongoose');
-const { addDays, addMonths, addYears } = require('date-fns');
+const { addDays, addMonths, addYears, differenceInDays } = require('date-fns');
+const { addEventToOutbox } = require('../../shared/events/outbox.helper');
 
 const Subscription       = require('../../models/Subscription.model');
 const SubscriptionEvent  = require('../../models/SubscriptionEvent.model');
-const PlanVersion        = require('../../models/PlanVersion.model');
-const Plan               = require('../../models/Plan.model');
-const Tenant             = require('../../models/Tenant.model');
-const User               = require('../../models/User.model');
+const identityFacade     = require('../../shared/facades/identity.facade');
 const { AppError }       = require('../../shared/errors/AppError');
 const { ERROR_CODES }    = require('../../shared/errors/errorCodes');
 const { validateTransition } = require('./subscription.statemachine');
@@ -43,63 +41,7 @@ const invalidateTenantCache = async (tenantId) => {
   );
 };
 
-// ── PlanVersion Helper ─────────────────────────────────────────
-/**
- * Get the latest PlanVersion for a plan, or create one if none exists.
- * Returns the latest version document.
- */
-const getLatestPlanVersion = async (planId, plan) => {
-  const existing = await PlanVersion.findOne({ planId }).sort({ version: -1 });
-  if (existing) return existing;
-
-  // Bootstrap: create version 1 if plan has no versions yet (shouldn't happen after Phase 2 seeder)
-  return PlanVersion.create({
-    planId,
-    version:     1,
-    name:        plan.name,
-    displayName: plan.displayName,
-    price:       plan.price,
-    currency:    plan.currency,
-    interval:    plan.interval,
-    features: new Map(Object.entries({
-      max_seats:           plan.features.max_seats,
-      api_calls_per_month: plan.features.api_calls_per_month,
-      storage_gb:          plan.features.storage_gb,
-      advanced_analytics:  plan.features.advanced_analytics,
-      ai_assistant:        plan.features.ai_assistant,
-      priority_support:    plan.features.priority_support,
-    })),
-    snapshotAt:  new Date(),
-  });
-};
-
-/**
- * Create a new PlanVersion snapshot for a given plan (used on upgrade).
- */
-const createPlanVersionSnapshot = async (plan) => {
-  const latest = await PlanVersion.findOne({ planId: plan._id }).sort({ version: -1 });
-  const nextVersion = (latest?.version || 0) + 1;
-
-  return PlanVersion.create({
-    planId:      plan._id,
-    version:     nextVersion,
-    name:        plan.name,
-    displayName: plan.displayName,
-    price:       plan.price,
-    currency:    plan.currency,
-    interval:    plan.interval,
-    features: new Map(Object.entries({
-      max_seats:           plan.features.max_seats,
-      api_calls_per_month: plan.features.api_calls_per_month,
-      storage_gb:          plan.features.storage_gb,
-      advanced_analytics:  plan.features.advanced_analytics,
-      ai_assistant:        plan.features.ai_assistant,
-      priority_support:    plan.features.priority_support,
-    })),
-    snapshotAt:  new Date(),
-  });
-};
-
+// ── PlanVersion Helper (Moved to identity.facade.js) ─────────
 // ── Period Helpers ─────────────────────────────────────────────
 const getPeriodEnd = (start, interval) =>
   interval === 'annual' ? addYears(start, 1) : addMonths(start, 1);
@@ -119,11 +61,11 @@ const getPeriodEnd = (start, interval) =>
 const createSubscription = async (tenantId, planId, options = {}) => {
   const { seatCount = 1, actorUser = null } = options;
 
-  const plan = await Plan.findById(planId);
+  const plan = await identityFacade.getPlan(planId);
   if (!plan) throw new AppError('Plan not found.', 404, ERROR_CODES.NOT_FOUND);
   if (!plan.isActive) throw new AppError('Plan is not active.', 422, ERROR_CODES.PLAN_ARCHIVED);
 
-  const planVersion = await getLatestPlanVersion(plan._id, plan);
+  const planVersion = await identityFacade.getLatestPlanVersion(plan._id, plan);
 
   const now     = new Date();
   const status  = plan.trialDays > 0 ? 'trialing' : 'active';
@@ -172,17 +114,15 @@ const createSubscription = async (tenantId, planId, options = {}) => {
 
   // Update Tenant.currentPlanId + features so tenantScope middleware
   // can read the correct seatLimit from tenant.features.max_seats
-  await Tenant.findByIdAndUpdate(tenantId, {
-    currentPlanId: plan._id,
-    features: new Map(Object.entries({
-      max_seats:           plan.features.max_seats,
-      api_calls_per_month: plan.features.api_calls_per_month,
-      storage_gb:          plan.features.storage_gb,
-      advanced_analytics:  plan.features.advanced_analytics,
-      ai_assistant:        plan.features.ai_assistant,
-      priority_support:    plan.features.priority_support,
-    })),
-  });
+  const featuresMap = new Map(Object.entries({
+    max_seats:           plan.features.max_seats,
+    api_calls_per_month: plan.features.api_calls_per_month,
+    storage_gb:          plan.features.storage_gb,
+    advanced_analytics:  plan.features.advanced_analytics,
+    ai_assistant:        plan.features.ai_assistant,
+    priority_support:    plan.features.priority_support,
+  }));
+  await identityFacade.updateTenantFeatures(tenantId, plan._id, featuresMap);
 
   await invalidateTenantCache(tenantId.toString());
 
@@ -217,10 +157,15 @@ const getSubscription = async (tenantId) => {
   const subscription = await Subscription.findOne({
     tenantId,
     status: { $ne: 'cancelled' },
-  })
-    .populate('planId', 'name displayName price currency interval features isActive')
-    .populate('planVersionId', 'name displayName price currency interval features version')
-    .lean();
+  }).lean();
+
+  if (!subscription) {
+    throw new AppError('No active subscription found for this tenant.', 404, ERROR_CODES.SUBSCRIPTION_NOT_FOUND);
+  }
+
+  // Populate manually via Facade to avoid cross-domain Mongoose populates
+  subscription.planId = await identityFacade.getPlan(subscription.planId);
+  subscription.planVersionId = await identityFacade.getPlanVersion(subscription.planVersionId);
 
   if (!subscription) {
     throw new AppError('No active subscription found for this tenant.', 404, ERROR_CODES.SUBSCRIPTION_NOT_FOUND);
@@ -253,6 +198,16 @@ const getSubscription = async (tenantId) => {
  * @returns {Promise<{ subscription, proratedInvoice }>}
  */
 const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantContext) => {
+  // 1. Pre-fetch Identity reference data OUTSIDE the Billing transaction
+  const targetPlan = await identityFacade.getPlan(targetPlanId);
+  if (!targetPlan || !targetPlan.isActive) {
+    throw new AppError('Target plan is not available.', 422, ERROR_CODES.PLAN_ARCHIVED);
+  }
+  
+  // This replicates the old logic of creating a PlanVersion snapshot during upgrade.
+  // We do it before the transaction because it affects the Identity domain.
+  const newPlanVersion = await identityFacade.createPlanVersionSnapshot(targetPlan);
+
   const session = await mongoose.startSession();
   let result;
 
@@ -278,14 +233,8 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
         );
       }
 
-      // 2. Load target plan
-      const targetPlan = await Plan.findById(targetPlanId).session(session);
-      if (!targetPlan || !targetPlan.isActive) {
-        throw new AppError('Target plan is not available.', 422, ERROR_CODES.PLAN_ARCHIVED);
-      }
-
       // 3. Load current plan version for price comparison
-      const currentPlanVersion = await PlanVersion.findById(subscription.planVersionId).session(session);
+      const currentPlanVersion = await identityFacade.getPlanVersion(subscription.planVersionId);
       if (!currentPlanVersion) {
         throw new AppError('Current plan version not found.', 500, ERROR_CODES.INTERNAL_ERROR);
       }
@@ -301,7 +250,7 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
 
       // 5. Seat conflict check — new plan must have enough seats for current members
       const usedSeats = tenantContext?.usedSeats
-        ?? await User.countDocuments({ tenantId, status: { $in: ['active', 'invited'] } });
+        ?? await identityFacade.getActiveUserCount(tenantId);
 
       if (targetPlan.features.max_seats < usedSeats) {
         throw new AppError(
@@ -321,28 +270,7 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
         periodEnd:    subscription.currentPeriodEnd,
       });
 
-      // 7. Create PlanVersion snapshot for target plan
-      const latestTargetVersion = await PlanVersion.findOne({ planId: targetPlanId }).sort({ version: -1 }).session(session);
-      const newVersion = await PlanVersion.create([{
-        planId:      targetPlan._id,
-        version:     (latestTargetVersion?.version || 0) + 1,
-        name:        targetPlan.name,
-        displayName: targetPlan.displayName,
-        price:       targetPlan.price,
-        currency:    targetPlan.currency,
-        interval:    targetPlan.interval,
-        // Convert Mongoose subdocument to a plain Map (PlanVersion.features is Map type)
-        features: new Map(Object.entries({
-          max_seats:           targetPlan.features.max_seats,
-          api_calls_per_month: targetPlan.features.api_calls_per_month,
-          storage_gb:          targetPlan.features.storage_gb,
-          advanced_analytics:  targetPlan.features.advanced_analytics,
-          ai_assistant:        targetPlan.features.ai_assistant,
-          priority_support:    targetPlan.features.priority_support,
-        })),
-        snapshotAt:  new Date(),
-      }], { session });
-      const newPlanVersion = newVersion[0];
+      // 7. PlanVersion snapshot was created outside the transaction.
 
       // 8. Create proration Invoice (only if net amount > 0)
       let proratedInvoice = null;
@@ -415,26 +343,8 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
       subscription.planVersionId = newPlanVersion._id;
       // seatCount = actual active/invited users in this tenant (not the plan max capacity).
       // Recount here so the value is always accurate after an upgrade.
-      subscription.seatCount = await User.countDocuments({
-        tenantId,
-        status: { $in: ['active', 'invited'] },
-      });
+      subscription.seatCount = await identityFacade.getActiveUserCount(tenantId);
       await subscription.save({ session });
-
-      // 10. Update Tenant.currentPlanId + features
-      const featuresMap = new Map(Object.entries({
-        max_seats:           targetPlan.features.max_seats,
-        api_calls_per_month: targetPlan.features.api_calls_per_month,
-        storage_gb:          targetPlan.features.storage_gb,
-        advanced_analytics:  targetPlan.features.advanced_analytics,
-        ai_assistant:        targetPlan.features.ai_assistant,
-        priority_support:    targetPlan.features.priority_support,
-      }));
-
-      await Tenant.findByIdAndUpdate(tenantId, {
-        currentPlanId: targetPlan._id,
-        features:      featuresMap,
-      }, { session });
 
       // 11. Create SubscriptionEvent
       await SubscriptionEvent.create([{
@@ -451,6 +361,28 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
           ['newPlanVersionId', newPlanVersion._id.toString()],
         ]),
       }], { session });
+
+      await addEventToOutbox({
+        eventType: 'subscription.upgraded',
+        aggregateType: 'subscription',
+        aggregateId: subscription._id.toString(),
+        tenantId: tenantId.toString(),
+        payload: {
+          subscriptionId: subscription._id.toString(),
+          oldPlanId: fromPlanId.toString(),
+          newPlanId: targetPlan._id.toString(),
+          proratedInvoiceId: proratedInvoice ? proratedInvoice._id.toString() : null,
+          features: {
+            max_seats: targetPlan.features.max_seats,
+            api_calls_per_month: targetPlan.features.api_calls_per_month,
+            storage_gb: targetPlan.features.storage_gb,
+            advanced_analytics: targetPlan.features.advanced_analytics,
+            ai_assistant: targetPlan.features.ai_assistant,
+            priority_support: targetPlan.features.priority_support,
+          }
+        },
+        session,
+      });
 
       // 12. AuditLog
       await createAuditLog({
@@ -512,10 +444,10 @@ const downgradeSubscription = async (tenantId, targetPlanId, reason, actorUser, 
 
   validateTransition(subscription.status, 'pending_downgrade');
 
-  const targetPlan = await Plan.findById(targetPlanId);
+  const targetPlan = await identityFacade.getPlan(targetPlanId);
   if (!targetPlan || !targetPlan.isActive) throw new AppError('Target plan not available.', 422, ERROR_CODES.PLAN_ARCHIVED);
 
-  const currentPlanVersion = await PlanVersion.findById(subscription.planVersionId);
+  const currentPlanVersion = await identityFacade.getPlanVersion(subscription.planVersionId);
   if (!currentPlanVersion) throw new AppError('Current plan version not found.', 500, ERROR_CODES.INTERNAL_ERROR);
 
   // Must be lower price
@@ -525,7 +457,7 @@ const downgradeSubscription = async (tenantId, targetPlanId, reason, actorUser, 
 
   // Seat conflict — new plan must accommodate current members
   const usedSeats = tenantContext?.usedSeats
-    ?? await User.countDocuments({ tenantId, status: { $in: ['active', 'invited'] } });
+    ?? await identityFacade.getActiveUserCount(tenantId);
 
   if (targetPlan.features.max_seats < usedSeats) {
     throw new AppError(
@@ -650,7 +582,7 @@ const cancelSubscription = async (tenantId, { cancelAtPeriodEnd = true, reason }
   if (!cancelAtPeriodEnd) {
     subscription.status = 'cancelled';
     // Immediate cancellation → update tenant status
-    await Tenant.findByIdAndUpdate(tenantId, { status: 'cancelled' });
+    await identityFacade.updateTenantStatus(tenantId, 'cancelled');
   }
 
   await subscription.save();
@@ -689,7 +621,7 @@ const reactivateSubscription = async (tenantId, actorUser) => {
 
   validateTransition(subscription.status, 'active');
 
-  const plan = await Plan.findById(subscription.planId);
+  const plan = await identityFacade.getPlan(subscription.planId);
   if (!plan || !plan.isActive) throw new AppError('Plan is no longer available.', 422, ERROR_CODES.PLAN_ARCHIVED);
 
   const now         = new Date();
@@ -711,7 +643,7 @@ const reactivateSubscription = async (tenantId, actorUser) => {
   await subscription.save();
 
   // Restore tenant status
-  await Tenant.findByIdAndUpdate(tenantId, { status: 'active' });
+  await identityFacade.updateTenantStatus(tenantId, 'active');
 
   await Promise.all([
     SubscriptionEvent.create({
