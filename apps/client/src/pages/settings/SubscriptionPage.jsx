@@ -216,7 +216,9 @@ export default function SubscriptionPage() {
                   {Object.entries(sub.planVersionId?.features instanceof Map
                     ? Object.fromEntries(sub.planVersionId.features)
                     : (sub.planVersionId?.features || sub.planId?.features || {})
-                  ).map(([k, v]) => (
+                  )
+                  .filter(([, v]) => v !== false)
+                  .map(([k, v]) => (
                     <span key={k} className="signal-tag">
                       {v === true ? <Check size={10} style={{ marginRight: 4 }} /> : null}
                       {k.replace(/_/g, ' ')}
