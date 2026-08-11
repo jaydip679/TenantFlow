@@ -37,6 +37,7 @@ const { Worker }           = require('bullmq');
 const { bullmqConnection } = require('../config/bullmq');
 const logger               = require('../shared/utils/logger');
 const { QUEUE_NAME }       = require('../queues/payment.queue');
+const { addEventToOutbox } = require('../shared/events/outbox.helper');
 
 /**
  * @param {import('bullmq').Job} job
@@ -47,9 +48,9 @@ const processPaymentJob = async (job) => {
   logger.info({ jobId: job.id, event, razorpayOrderId, razorpayPaymentId, source }, 'Processing payment job');
 
   // Lazy-require ensures DB is connected before first use
+  const mongoose           = require('mongoose');
   const PaymentTransaction = require('../models/PaymentTransaction.model');
   const Invoice            = require('../models/Invoice.model');
-  const Tenant             = require('../models/Tenant.model');
   const WebhookLog         = require('../models/WebhookLog.model');
   const { createAuditLog } = require('../shared/utils/auditLogService');
   const { enqueueEmail }   = require('../queues/email.queue');
@@ -68,57 +69,94 @@ const processPaymentJob = async (job) => {
       return;
     }
 
-    // ── 1. Update PaymentTransaction ──────────────────────────
-    const prevTransactionStatus = transaction.status;
-    transaction.status            = 'captured';
-    transaction.razorpayPaymentId = razorpayPaymentId;
-    transaction.capturedAt        = new Date();
-    transaction.method            = payload?.payment?.entity?.method || null;
-    await transaction.save();
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        // ── 1. Update PaymentTransaction ──────────────────────────
+        transaction.status            = 'captured';
+        transaction.razorpayPaymentId = razorpayPaymentId;
+        transaction.capturedAt        = new Date();
+        transaction.method            = payload?.payment?.entity?.method || null;
+        await transaction.save({ session });
 
-    // ── 2. Mark Invoice paid ──────────────────────────────────
-    const invoice = await Invoice.findById(transaction.invoiceId);
-    if (invoice && invoice.status !== 'paid') {
-      const invoiceBefore = invoice.toObject();
+        // ── 2. Mark Invoice paid ──────────────────────────────────
+        let invoiceBefore = null;
+        const invoice = await Invoice.findById(transaction.invoiceId).session(session);
+        if (invoice && invoice.status !== 'paid') {
+          invoiceBefore = invoice.toObject();
+          invoice.status     = 'paid';
+          invoice.amountPaid = invoice.total;
+          invoice.amountDue  = 0;
+          invoice.paidAt     = new Date();
+          await invoice.save({ session });
 
-      invoice.status     = 'paid';
-      invoice.amountPaid = invoice.total;
-      invoice.amountDue  = 0;
-      invoice.paidAt     = new Date();
-      await invoice.save();
+          // ── 3. Resolve DunningRecord (Phase 6) ─────────────────
+          try {
+            const dunningService = require('../modules/payments/dunning.service');
+            const DunningRecord = require('../models/DunningRecord.model');
+            const activeDunning = await DunningRecord.findOne({ invoiceId: invoice._id, status: 'active' }).session(session);
+            if (activeDunning) {
+              await dunningService.resolveDunning(activeDunning._id.toString(), transaction.razorpayPaymentId, session);
+            }
+          } catch (err) {
+            logger.warn({ err: err.message }, 'DunningRecord resolve failed');
+          }
 
-      // ── 3. Restore past_due tenant to active ─────────────
-      const tenant = await Tenant.findById(invoice.tenantId).select('status');
-      if (tenant && tenant.status === 'past_due') {
-        await Tenant.findByIdAndUpdate(invoice.tenantId, { status: 'active' });
-        logger.info({ tenantId: invoice.tenantId }, 'Tenant restored from past_due to active after payment');
-      }
+          // ── 4. Outbox Events: invoice.paid & payment.succeeded ────
+          await addEventToOutbox({
+            eventType: 'invoice.paid',
+            aggregateType: 'invoice',
+            aggregateId: invoice._id.toString(),
+            tenantId: invoice.tenantId.toString(),
+            payload: {
+              amountPaid: invoice.amountPaid,
+              paymentId: transaction._id.toString(),
+            },
+            session,
+          });
 
-      // ── 4. Resolve DunningRecord (Phase 6) ─────────────────
-      try {
-        const dunningService = require('../modules/payments/dunning.service');
-        const DunningRecord = require('../models/DunningRecord.model');
-        const activeDunning = await DunningRecord.findOne({ invoiceId: invoice._id, status: 'active' });
-        if (activeDunning) {
-          await dunningService.resolveDunning(activeDunning._id.toString(), transaction.razorpayPaymentId);
+          await addEventToOutbox({
+            eventType: 'payment.succeeded',
+            aggregateType: 'payment',
+            aggregateId: transaction._id.toString(),
+            tenantId: invoice.tenantId.toString(),
+            payload: {
+              orderId: transaction.razorpayOrderId,
+              invoiceId: invoice._id.toString(),
+              amount: transaction.amount,
+              method: transaction.method,
+            },
+            session,
+          });
         }
-      } catch (err) {
-        logger.warn({ err: err.message }, 'DunningRecord resolve failed');
-      }
 
-      // ── 5. Audit Log ─────────────────────────────────────
+        // ── Update WebhookLog if from webhook source ──────────────────
+        if (source === 'webhook' && webhookLogId) {
+          await WebhookLog.findByIdAndUpdate(webhookLogId, {
+            status:      'processed',
+            processedAt: new Date(),
+          }, { session });
+        }
+      });
+    } finally {
+      session.endSession();
+    }
+
+    // ── Post-transaction Operations ────────────────────────────────
+    const invoice = await Invoice.findById(transaction.invoiceId);
+    if (invoice) {
+      // Audit Log
       await createAuditLog({
         event:        'invoice.paid',
         resourceType: 'invoice',
         resourceId:   invoice._id,
         tenantId:     invoice.tenantId,
         actor:        { id: null, role: 'system', email: 'system' },
-        before:       invoiceBefore,
-        after:        invoice.toObject(),
       }).catch((err) => logger.warn({ err: err.message }, 'AuditLog failed for invoice.paid'));
 
-      // ── 6. Enqueue payment success email ──────────────────
+      // Enqueue payment success email
       try {
+        const Tenant = require('../models/Tenant.model');
         const billingTenant = await Tenant.findById(invoice.tenantId).select('name billingEmail').lean();
         if (billingTenant?.billingEmail) {
           await enqueueEmail({
@@ -158,27 +196,58 @@ const processPaymentJob = async (job) => {
 
   } else if (event === 'payment.failed') {
     // ── payment.failed flow ───────────────────────────────────
-
-    transaction.status            = 'failed';
-    transaction.razorpayPaymentId = razorpayPaymentId || transaction.razorpayPaymentId;
-    transaction.errorCode         = payload?.payment?.entity?.error_code || null;
-    transaction.errorDescription  = payload?.payment?.entity?.error_description || null;
-    await transaction.save();
-
-    // Phase 6: initiate dunning workflow
+    const session = await mongoose.startSession();
     try {
-      const dunningService = require('../modules/payments/dunning.service');
-      await dunningService.initiateDunning(
-        transaction.tenantId.toString(),
-        transaction.subscriptionId.toString(),
-        transaction.invoiceId.toString()
-      );
-    } catch (err) {
-      logger.warn({ err: err.message, invoiceId: transaction.invoiceId }, 'Dunning initiation failed');
+      await session.withTransaction(async () => {
+        transaction.status            = 'failed';
+        transaction.razorpayPaymentId = razorpayPaymentId || transaction.razorpayPaymentId;
+        transaction.errorCode         = payload?.payment?.entity?.error_code || null;
+        transaction.errorDescription  = payload?.payment?.entity?.error_description || null;
+        await transaction.save({ session });
+
+        // Phase 6: initiate dunning workflow
+        try {
+          const dunningService = require('../modules/payments/dunning.service');
+          await dunningService.initiateDunning(
+            transaction.tenantId.toString(),
+            transaction.subscriptionId.toString(),
+            transaction.invoiceId.toString(),
+            session
+          );
+        } catch (err) {
+          logger.warn({ err: err.message, invoiceId: transaction.invoiceId }, 'Dunning initiation failed');
+        }
+
+        // ── Outbox Event: payment.failed ───────────────────────
+        await addEventToOutbox({
+          eventType: 'payment.failed',
+          aggregateType: 'payment',
+          aggregateId: transaction._id.toString(),
+          tenantId: transaction.tenantId.toString(),
+          payload: {
+            orderId: transaction.razorpayOrderId,
+            invoiceId: transaction.invoiceId.toString(),
+            errorCode: transaction.errorCode,
+            errorDescription: transaction.errorDescription,
+          },
+          session,
+        });
+
+        // ── Update WebhookLog if from webhook source ───────────
+        if (source === 'webhook' && webhookLogId) {
+          await WebhookLog.findByIdAndUpdate(webhookLogId, {
+            status:      'processed',
+            processedAt: new Date(),
+          }, { session });
+        }
+      });
+    } finally {
+      session.endSession();
     }
 
     // Enqueue payment failed email
     try {
+      const Tenant = require('../models/Tenant.model');
       const failedTenant = await Tenant.findById(transaction.tenantId).select('name billingEmail').lean();
       if (failedTenant?.billingEmail) {
         await enqueueEmail({
@@ -209,18 +278,6 @@ const processPaymentJob = async (job) => {
       }
     } catch (err) {
       logger.warn({ err: err.message }, 'Socket.IO payment:failed emit failed (non-critical)');
-    }
-  }
-
-  // ── Update WebhookLog if from webhook source ──────────────────
-  if (source === 'webhook' && webhookLogId) {
-    try {
-      await WebhookLog.findByIdAndUpdate(webhookLogId, {
-        status:      'processed',
-        processedAt: new Date(),
-      });
-    } catch (err) {
-      logger.warn({ err: err.message, webhookLogId }, 'WebhookLog update failed');
     }
   }
 

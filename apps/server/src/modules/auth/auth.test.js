@@ -27,6 +27,9 @@ const { ERROR_CODES } = require('../../shared/errors/errorCodes');
 jest.mock('../../models/User.model');
 jest.mock('../../models/Tenant.model');
 jest.mock('../../models/RefreshToken.model');
+jest.mock('../../shared/facades/billing.facade', () => ({
+  createTrialSubscription: jest.fn().mockResolvedValue({ _id: 'sub-123' }),
+}));
 jest.mock('../../config/redis', () => ({
   get:  jest.fn(),
   set:  jest.fn(),
@@ -44,6 +47,9 @@ jest.mock('../../shared/utils/otpService', () => ({
 }));
 jest.mock('../../shared/utils/auditLogService', () => ({
   createAuditLog: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../shared/events/outbox.helper', () => ({
+  addEventToOutbox: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('mongoose', () => {
   const actual = jest.requireActual('mongoose');
@@ -96,6 +102,7 @@ describe('authService.register()', () => {
     User.findOne   = jest.fn().mockResolvedValue(null); // No existing user
     // Tenant.findOne used by generateSlug — must chain .lean()
     Tenant.findOne = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    Tenant.findById = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: 'tenant-123', name: 'Acme Corp' }) });
     Tenant.create  = jest.fn().mockResolvedValue([{ _id: 'tenant-id-1', name: 'Acme Corp' }]);
     User.create    = jest.fn().mockResolvedValue([makeUser({ _id: 'user-id-1', isEmailVerified: false })]);
     Tenant.findByIdAndUpdate = jest.fn().mockResolvedValue({});
@@ -133,6 +140,7 @@ describe('authService.verifyEmail()', () => {
     const otpSvc = require('../../shared/utils/otpService');
     otpSvc.verifyOTP.mockResolvedValue(true);
     User.findOneAndUpdate = jest.fn().mockResolvedValue(user);
+    Tenant.findById = jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: 'tenant-123', name: 'Acme Corp' }) });
     RefreshToken.create  = jest.fn().mockResolvedValue({});
   });
 

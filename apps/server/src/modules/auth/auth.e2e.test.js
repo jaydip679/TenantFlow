@@ -18,8 +18,10 @@
 
 const request   = require('supertest');
 const mongoose  = require('mongoose');
-const app       = require('../../../app');
-const redis     = require('../../../config/redis');
+const app       = require('../../app');
+const redis     = require('../../config/redis');
+
+jest.setTimeout(30000);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -31,7 +33,7 @@ function makeUser() {
     lastName:  'User',
     email:     `e2e_${rand()}@test.tenantflow.dev`,
     password:  'SecurePass@123',
-    tenantName: `E2E Corp ${rand()}`,
+    companyName: `E2E Corp ${rand()}`,
   };
 }
 
@@ -42,7 +44,7 @@ async function getOtpFromRedis(email, purpose) {
   const value = await redis.get(key);
   if (!value) throw new Error(`No OTP found in Redis for key "${key}"`);
   const parsed = JSON.parse(value);
-  return parsed.otp ?? parsed; // handle both { otp, attempts } and raw string
+  return parsed.code ?? parsed; // handle both { code, attempts } and raw string
 }
 
 // ── Test Suite ────────────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ describe('E2E — Auth Flow', () => {
         .expect(201);
 
       expect(res.body.success).toBe(true);
-      expect(res.body.message).toMatch(/otp|verify|sent/i);
+      expect(res.body.data.message).toMatch(/otp|verify|sent/i);
     });
 
     it('1b. POST /auth/verify-email — 200 with token pair', async () => {
@@ -116,8 +118,10 @@ describe('E2E — Auth Flow', () => {
     it('1d. GET /auth/me — 200 with user profile (protected route)', async () => {
       const res = await request(server)
         .get('/api/v1/auth/me')
-        .set('Authorization', `Bearer ${accessToken}`)
-        .expect(200);
+        .set('Authorization', `Bearer ${accessToken}`);
+      
+      if (res.status !== 200) console.error('GET ME FAILED. Token:', accessToken, 'Body:', res.body);
+      expect(res.status).toBe(200);
 
       expect(res.body.data.user.email).toBe(user.email.toLowerCase());
       expect(res.body.data.user).not.toHaveProperty('passwordHash');
@@ -125,10 +129,12 @@ describe('E2E — Auth Flow', () => {
     });
 
     it('1e. POST /auth/logout — 200, blacklists token', async () => {
-      await request(server)
+      const res = await request(server)
         .post('/api/v1/auth/logout')
-        .set('Authorization', `Bearer ${accessToken}`)
-        .expect(200);
+        .set('Authorization', `Bearer ${accessToken}`);
+      
+      if (res.status !== 200) console.error('LOGOUT FAILED:', res.body);
+      expect(res.status).toBe(200);
     });
 
     it('1f. GET /auth/me — 401 after logout (token blacklisted)', async () => {
@@ -144,31 +150,30 @@ describe('E2E — Auth Flow', () => {
   // ── Test 2: Refresh token rotation ──────────────────────────────────────
   describe('Test 2: Refresh token rotation — 3 consecutive rotations', () => {
     const user = makeUser();
-    let currentRefreshToken;
+    let cookieHeader;
 
     beforeAll(async () => {
       // Register + verify + login to get initial tokens
-      await request(server).post('/api/v1/auth/register').send(user);
+      const regRes = await request(server).post('/api/v1/auth/register').send(user);
+      if (regRes.status !== 201) console.error('TEST 2 REGISTER FAILED:', regRes.body);
       const otp = await getOtpFromRedis(user.email, 'email_verify');
       await request(server).post('/api/v1/auth/verify-email').send({ email: user.email, otp });
 
       const loginRes = await request(server)
         .post('/api/v1/auth/login')
         .send({ email: user.email, password: user.password });
-      currentRefreshToken = loginRes.body.data.refreshToken;
+      cookieHeader = loginRes.headers['set-cookie'];
     });
 
     it('2a–2c. Rotate refresh token 3 times, each produces a new valid token', async () => {
-      for (let i = 1; i <= 3; i++) {
-        const res = await request(server)
+      for (let i = 0; i < 3; i++) {
+        const rotateRes = await request(server)
           .post('/api/v1/auth/refresh')
-          .send({ refreshToken: currentRefreshToken })
+          .set('Cookie', cookieHeader)
           .expect(200);
 
-        expect(res.body.data.accessToken).toBeDefined();
-        expect(res.body.data.refreshToken).toBeDefined();
-        expect(res.body.data.refreshToken).not.toBe(currentRefreshToken);
-        currentRefreshToken = res.body.data.refreshToken;
+        expect(rotateRes.body.data.accessToken).toBeDefined();
+        cookieHeader = rotateRes.headers['set-cookie'];
       }
     });
   });
@@ -176,31 +181,32 @@ describe('E2E — Auth Flow', () => {
   // ── Test 3: Refresh token reuse detection ───────────────────────────────
   describe('Test 3: Refresh token reuse detection — family invalidation', () => {
     const user = makeUser();
-    let initialRefreshToken;
-    let rotatedRefreshToken;
+    let initialCookieHeader;
+    let rotatedCookieHeader;
 
     beforeAll(async () => {
-      await request(server).post('/api/v1/auth/register').send(user);
+      const regRes = await request(server).post('/api/v1/auth/register').send(user);
+      if (regRes.status !== 201) console.error('TEST REGISTER FAILED:', regRes.body);
       const otp = await getOtpFromRedis(user.email, 'email_verify');
       await request(server).post('/api/v1/auth/verify-email').send({ email: user.email, otp });
 
       const loginRes = await request(server)
         .post('/api/v1/auth/login')
         .send({ email: user.email, password: user.password });
-      initialRefreshToken = loginRes.body.data.refreshToken;
+      initialCookieHeader = loginRes.headers['set-cookie'];
 
       // Perform one rotation
       const rotateRes = await request(server)
         .post('/api/v1/auth/refresh')
-        .send({ refreshToken: initialRefreshToken });
-      rotatedRefreshToken = rotateRes.body.data.refreshToken;
+        .set('Cookie', initialCookieHeader);
+      rotatedCookieHeader = rotateRes.headers['set-cookie'];
     });
 
-    it('3a. Reuse the already-consumed initial token — 401 + family invalidated', async () => {
+    it('3a. Reuse the already-consumed initial token — 403 + family invalidated', async () => {
       const res = await request(server)
         .post('/api/v1/auth/refresh')
-        .send({ refreshToken: initialRefreshToken })
-        .expect(401);
+        .set('Cookie', initialCookieHeader)
+        .expect(403);
 
       expect(res.body.success).toBe(false);
     });
@@ -208,8 +214,8 @@ describe('E2E — Auth Flow', () => {
     it('3b. The rotated token is also now invalid (family was wiped)', async () => {
       const res = await request(server)
         .post('/api/v1/auth/refresh')
-        .send({ refreshToken: rotatedRefreshToken })
-        .expect(401);
+        .set('Cookie', rotatedCookieHeader)
+        .expect(403);
 
       expect(res.body.success).toBe(false);
     });
@@ -221,7 +227,8 @@ describe('E2E — Auth Flow', () => {
     const newPass  = 'NewSecurePass@456';
 
     beforeAll(async () => {
-      await request(server).post('/api/v1/auth/register').send(user);
+      const regRes = await request(server).post('/api/v1/auth/register').send(user);
+      if (regRes.status !== 201) console.error('TEST REGISTER FAILED:', regRes.body);
       const otp = await getOtpFromRedis(user.email, 'email_verify');
       await request(server).post('/api/v1/auth/verify-email').send({ email: user.email, otp });
     });

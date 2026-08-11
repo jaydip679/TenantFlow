@@ -26,6 +26,7 @@ const mongoose = require('mongoose');
 const bcrypt   = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 const { addDays }    = require('date-fns');
+const { addEventToOutbox } = require('../../shared/events/outbox.helper');
 
 // Models
 const User         = require('../../models/User.model');
@@ -187,11 +188,32 @@ const register = async ({ email, password, firstName, lastName, companyName }) =
       // Update tenant ownerId now that user _id is known
       await Tenant.findByIdAndUpdate(tenant._id, { ownerId: user._id }, { session });
 
+      await addEventToOutbox({
+        eventType: 'tenant.created',
+        aggregateType: 'tenant',
+        aggregateId: tenant._id.toString(),
+        tenantId: tenant._id.toString(),
+        payload: {
+          name: tenant.name,
+          email: user.email,
+        },
+        session,
+      });
+
       userId   = user._id;
       tenantId = tenant._id;
     });
   } finally {
     session.endSession();
+  }
+
+  // Create Trial Subscription (outside transaction to maintain bounded contexts)
+  try {
+    const billingFacade = require('../../shared/facades/billing.facade');
+    await billingFacade.createTrialSubscription(tenantId);
+  } catch (err) {
+    // Non-fatal for registration, but log it
+    logger.error({ err, tenantId }, 'Failed to create trial subscription during registration');
   }
 
   // Post-transaction: generate + store OTP (outside transaction — idempotent)
