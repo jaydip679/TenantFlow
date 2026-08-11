@@ -68,6 +68,13 @@ const startServer = async () => {
   const { initDunningCheckCron } = require('./cron/dunningCheck.cron');
   initDunningCheckCron();
 
+  // Phase 1C — Transactional Outbox Publisher & Consumers
+  const { startPublisher } = require('./jobs/outbox.publisher');
+  startPublisher();
+
+  const { startTenantConsumer } = require('./jobs/tenant.consumer');
+  await startTenantConsumer();
+
   // ── Create HTTP server ──────────────────────────────
   // MUST be created before Socket.IO initialization (Phase 7)
   const server = http.createServer(app);
@@ -114,6 +121,12 @@ const startServer = async () => {
       logger.info('HTTP server closed — no more new connections accepted');
 
       try {
+        const { stopPublisher } = require('./jobs/outbox.publisher');
+        await stopPublisher();
+        
+        const { stopTenantConsumer } = require('./jobs/tenant.consumer');
+        await stopTenantConsumer();
+
         const mongoose = require('mongoose');
         await mongoose.connection.close();
         logger.info('MongoDB connection closed');
