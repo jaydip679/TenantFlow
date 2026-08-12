@@ -112,11 +112,24 @@ const tenantSchema = new Schema(
       type:    Date,
       default: null,
     },
+    // Event ordering protection for Analytics projections
+    aggregateVersion: {
+      type:    Number,
+      default: 1,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+// ── Hooks ────────────────────────────────────────────────────
+tenantSchema.pre('save', function (next) {
+  if (this.isModified()) {
+    this.aggregateVersion = (this.aggregateVersion || 0) + 1;
+  }
+  next();
+});
 
 // ── Indexes (REF: docs/DATABASE_DESIGN.md §5.2) ──────────────
 tenantSchema.index({ slug: 1 }, { unique: true });

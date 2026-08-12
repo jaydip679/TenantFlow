@@ -101,6 +101,8 @@ const initiateDunning = async (tenantId, subscriptionId, invoiceId, session = nu
   if (session) {
     await addEventToOutbox({
       eventType: 'dunning.started',
+      eventVersion: 'v1',
+      producer: 'billing-service',
       aggregateType: 'dunning',
       aggregateId: dunningRecord._id.toString(),
       tenantId: tenantId.toString(),
@@ -378,6 +380,8 @@ const abandonDunning = async (dunningRecordId) => {
 
       await addEventToOutbox({
         eventType: 'dunning.abandoned',
+        eventVersion: 'v1',
+        producer: 'billing-service',
         aggregateType: 'dunning',
         aggregateId: dunningRecord._id.toString(),
         tenantId: dunningRecord.tenantId.toString(),

@@ -79,11 +79,24 @@ const invoiceSchema = new Schema(
     voidedAt:   { type: Date, default: null },
     voidReason: { type: String, default: null },
     metadata:   { type: Map, of: Schema.Types.Mixed, default: {} },
+    // Event ordering protection for Analytics projections
+    aggregateVersion: {
+      type:    Number,
+      default: 1,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+// ── Hooks ───────────────────────────────────────────────────────
+invoiceSchema.pre('save', function (next) {
+  if (this.isModified()) {
+    this.aggregateVersion = (this.aggregateVersion || 0) + 1;
+  }
+  next();
+});
 
 // ── Indexes (REF: docs/DATABASE_DESIGN.md §5.6) ────────────────
 // Note: invoiceNumber unique index is implicitly created by { unique: true } on the field.

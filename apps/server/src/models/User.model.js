@@ -105,6 +105,11 @@ const userSchema = new Schema(
       type:    Date,
       default: null,
     },
+    // Event ordering protection for Analytics projections
+    aggregateVersion: {
+      type:    Number,
+      default: 1,
+    },
   },
   {
     timestamps: true,
@@ -128,6 +133,10 @@ userSchema.index({ tenantId: 1, createdAt: -1 });       // Member list, paginate
 // ── Pre-Save Hook — Tenant Isolation (Layer 3) ────────────────
 // REF: docs/MASTER_AGENT_PROMPT.md §2.3 — Four-Layer Tenant Isolation
 userSchema.pre('save', function (next) {
+  if (this.isModified()) {
+    this.aggregateVersion = (this.aggregateVersion || 0) + 1;
+  }
+  
   // Super admin legitimately has tenantId: null — skip assertion
   if (this.role === 'super_admin') return next();
 

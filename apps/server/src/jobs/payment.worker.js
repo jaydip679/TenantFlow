@@ -105,18 +105,25 @@ const processPaymentJob = async (job) => {
           // ── 4. Outbox Events: invoice.paid & payment.succeeded ────
           await addEventToOutbox({
             eventType: 'invoice.paid',
+            eventVersion: 'v1',
+            producer: 'billing-service',
             aggregateType: 'invoice',
             aggregateId: invoice._id.toString(),
             tenantId: invoice.tenantId.toString(),
             payload: {
+              invoiceId: invoice._id.toString(),
               amountPaid: invoice.amountPaid,
+              paidAt: invoice.paidAt,
               paymentId: transaction._id.toString(),
+              aggregateVersion: invoice.aggregateVersion,
             },
             session,
           });
 
           await addEventToOutbox({
             eventType: 'payment.succeeded',
+            eventVersion: 'v1',
+            producer: 'billing-service',
             aggregateType: 'payment',
             aggregateId: transaction._id.toString(),
             tenantId: invoice.tenantId.toString(),
@@ -221,6 +228,8 @@ const processPaymentJob = async (job) => {
         // ── Outbox Event: payment.failed ───────────────────────
         await addEventToOutbox({
           eventType: 'payment.failed',
+          eventVersion: 'v1',
+          producer: 'billing-service',
           aggregateType: 'payment',
           aggregateId: transaction._id.toString(),
           tenantId: transaction.tenantId.toString(),

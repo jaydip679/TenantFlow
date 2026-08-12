@@ -190,12 +190,33 @@ const register = async ({ email, password, firstName, lastName, companyName }) =
 
       await addEventToOutbox({
         eventType: 'tenant.created',
+        eventVersion: 'v1',
+        producer: 'identity-service',
         aggregateType: 'tenant',
         aggregateId: tenant._id.toString(),
         tenantId: tenant._id.toString(),
         payload: {
           name: tenant.name,
+          slug: tenant.slug,
           email: user.email,
+          createdAt: tenant.createdAt,
+          aggregateVersion: tenant.aggregateVersion
+        },
+        session,
+      });
+
+      await addEventToOutbox({
+        eventType: 'user.created',
+        eventVersion: 'v1',
+        producer: 'identity-service',
+        aggregateType: 'user',
+        aggregateId: user._id.toString(),
+        tenantId: tenant._id.toString(),
+        payload: {
+          userId: user._id.toString(),
+          email: user.email,
+          role: user.role,
+          aggregateVersion: user.aggregateVersion
         },
         session,
       });
@@ -352,6 +373,31 @@ const login = async (email, password, meta = {}) => {
     ip:           meta.ip,
     userAgent:    meta.userAgent,
   });
+
+  // Emit lightweight user.login event directly to Redis Streams (Phase 1D-A)
+  try {
+    const { RedisStreamsEventBus } = require('../../shared/events/redisStreamsEventBus');
+    const { createEventEnvelope } = require('../../shared/events/eventEnvelope');
+    
+    const eventBus = new RedisStreamsEventBus();
+    const envelope = createEventEnvelope({
+      eventType: 'user.login',
+      eventVersion: 'v1',
+      producer: 'identity-service',
+      tenantId: user.tenantId ? user.tenantId.toString() : null,
+      aggregateType: 'user',
+      aggregateId: user._id.toString(),
+      payload: {
+        userId: user._id.toString(),
+        email: user.email,
+        role: user.role,
+        ip: meta.ip || null
+      }
+    });
+    await eventBus.publish(envelope);
+  } catch (err) {
+    logger.warn({ err: err.message, userId: user._id }, 'Failed to publish user.login event');
+  }
 
   return {
     accessToken,

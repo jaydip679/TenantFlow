@@ -22,6 +22,7 @@
 const { v4: uuidv4 }  = require('uuid');
 const { addHours }    = require('date-fns');
 const bcrypt          = require('bcrypt');
+const mongoose        = require('mongoose');
 
 const Tenant           = require('../../models/Tenant.model');
 const User             = require('../../models/User.model');
@@ -217,20 +218,40 @@ const inviteMember = async (tenantId, email, role, actorUser, tenantContext) => 
 
   const inviteToken = uuidv4();
 
+  const session = await mongoose.startSession();
   let invitedUser;
   try {
-    invitedUser = await User.create({
-      tenantId,
-      email:           normalizedEmail,
-      passwordHash:    'INVITE_PENDING', // placeholder — set on acceptInvite
-      firstName:       'Invited',        // placeholder — overwritten on acceptInvite
-      lastName:        'User',           // placeholder — overwritten on acceptInvite
-      role,
-      status:          'invited',
-      isEmailVerified: false,
-      invitedBy:       actorUser.id,
-      inviteToken,
-      inviteExpiresAt: addHours(new Date(), INVITE_EXPIRY_H),
+    await session.withTransaction(async () => {
+      [invitedUser] = await User.create([{
+        tenantId,
+        email:           normalizedEmail,
+        passwordHash:    'INVITE_PENDING', // placeholder — set on acceptInvite
+        firstName:       'Invited',        // placeholder — overwritten on acceptInvite
+        lastName:        'User',           // placeholder — overwritten on acceptInvite
+        role,
+        status:          'invited',
+        isEmailVerified: false,
+        invitedBy:       actorUser.id,
+        inviteToken,
+        inviteExpiresAt: addHours(new Date(), INVITE_EXPIRY_H),
+      }], { session });
+
+      const { addEventToOutbox } = require('../../shared/events/outbox.helper');
+      await addEventToOutbox({
+        eventType: 'user.created',
+        eventVersion: 'v1',
+        producer: 'identity-service',
+        aggregateType: 'user',
+        aggregateId: invitedUser._id.toString(),
+        tenantId: tenantId.toString(),
+        payload: {
+          userId: invitedUser._id.toString(),
+          email: invitedUser.email,
+          role: invitedUser.role,
+          aggregateVersion: invitedUser.aggregateVersion
+        },
+        session,
+      });
     });
   } catch (err) {
     // E11000 = MongoDB duplicate key — email already registered (race condition or missed pre-check)
@@ -242,6 +263,8 @@ const inviteMember = async (tenantId, email, role, actorUser, tenantContext) => 
       );
     }
     throw err;
+  } finally {
+    session.endSession();
   }
 
   // Fetch inviter name for email
@@ -365,10 +388,33 @@ const removeMember = async (tenantId, targetUserId, actorUser) => {
   const targetUser = await User.findOne({ _id: targetUserId, tenantId });
   if (!targetUser) throw new AppError('Member not found.', 404, ERROR_CODES.NOT_FOUND);
 
-  await User.findByIdAndUpdate(targetUserId, {
-    status:    'deleted',
-    deletedAt: new Date(),
-  });
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      targetUser.status = 'deleted';
+      targetUser.deletedAt = new Date();
+      await targetUser.save({ session });
+
+      const { addEventToOutbox } = require('../../shared/events/outbox.helper');
+      await addEventToOutbox({
+        eventType: 'user.deleted',
+        eventVersion: 'v1',
+        producer: 'identity-service',
+        aggregateType: 'user',
+        aggregateId: targetUser._id.toString(),
+        tenantId: tenantId.toString(),
+        payload: {
+          userId: targetUser._id.toString(),
+          email: targetUser.email,
+          role: targetUser.role,
+          aggregateVersion: targetUser.aggregateVersion
+        },
+        session,
+      });
+    });
+  } finally {
+    session.endSession();
+  }
 
   await Promise.all([
     invalidateTenantCache(tenantId),

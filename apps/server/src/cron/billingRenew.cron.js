@@ -33,6 +33,7 @@ const Plan              = require('../models/Plan.model');
 const PlanVersion       = require('../models/PlanVersion.model');
 const redisClient       = require('../config/redis');
 const logger            = require('../shared/utils/logger');
+const { addEventToOutbox } = require('../shared/events/outbox.helper');
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -63,115 +64,183 @@ const processExpiredSubscription = async (subscription) => {
   }
 
   try {
-    // Reload inside lock to ensure freshness
-    const sub = await Subscription.findById(subscription._id);
-    if (!sub || new Date(sub.currentPeriodEnd) > new Date()) {
-      return; // Already processed or period extended
-    }
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        // Reload inside lock and tx to ensure freshness
+        const sub = await Subscription.findById(subscription._id).session(session);
+        if (!sub || new Date(sub.currentPeriodEnd) > new Date()) {
+          return; // Already processed or period extended
+        }
 
-    logger.info({ subscriptionId: sub._id, status: sub.status }, 'Processing expired subscription');
+        logger.info({ subscriptionId: sub._id, status: sub.status }, 'Processing expired subscription');
 
-    // A. cancelAtPeriodEnd=true — cancel now
-    if (sub.cancelAtPeriodEnd) {
-      const fromStatus = sub.status;
-      sub.status       = 'cancelled';
-      sub.cancelledAt  = new Date();
-      await sub.save();
+        // A. cancelAtPeriodEnd=true — cancel now
+        if (sub.cancelAtPeriodEnd) {
+          const fromStatus = sub.status;
+          sub.status       = 'cancelled';
+          sub.cancelledAt  = new Date();
+          await sub.save({ session });
 
-      await Promise.all([
-        Tenant.findByIdAndUpdate(sub.tenantId, { status: 'cancelled' }),
-        SubscriptionEvent.create({
-          tenantId:       sub.tenantId,
-          subscriptionId: sub._id,
-          event:          'subscription.cancelled',
-          fromStatus,
-          toStatus:       'cancelled',
-          triggeredBy:    { source: 'cron' },
-        }),
-        invalidateCache(sub.tenantId.toString()),
-      ]);
+          await Promise.all([
+            Tenant.findByIdAndUpdate(sub.tenantId, { status: 'cancelled' }, { session }),
+            SubscriptionEvent.create([{
+              tenantId:       sub.tenantId,
+              subscriptionId: sub._id,
+              event:          'subscription.cancelled',
+              fromStatus,
+              toStatus:       'cancelled',
+              triggeredBy:    { source: 'cron' },
+            }], { session }),
+          ]);
 
-      logger.info({ subscriptionId: sub._id }, 'Subscription cancelled at period end');
-      return;
-    }
+          await addEventToOutbox({
+            eventType: 'subscription.cancelled',
+            eventVersion: 'v1',
+            producer: 'billing-service',
+            aggregateType: 'subscription',
+            aggregateId: sub._id.toString(),
+            tenantId: sub.tenantId.toString(),
+            payload: {
+              subscriptionId: sub._id.toString(),
+              cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+              cancellationReason: sub.cancelReason || null,
+              aggregateVersion: sub.aggregateVersion
+            },
+            session
+          });
 
-    // B. pending_downgrade — apply the downgrade
-    if (sub.status === 'pending_downgrade' && sub.pendingPlanId) {
-      const newPlan = await Plan.findById(sub.pendingPlanId);
-      if (newPlan && newPlan.isActive) {
-        const latestVersion = await PlanVersion.findOne({ planId: newPlan._id }).sort({ version: -1 });
-        const newVersion = latestVersion?.version || 1;
+          invalidateCache(sub.tenantId.toString());
+          logger.info({ subscriptionId: sub._id }, 'Subscription cancelled at period end');
+          return;
+        }
 
-        const newPV = await PlanVersion.create({
-          planId:      newPlan._id,
-          version:     newVersion + 1,
-          name:        newPlan.name,
-          displayName: newPlan.displayName,
-          price:       newPlan.price,
-          currency:    newPlan.currency,
-          interval:    newPlan.interval,
-          features:    newPlan.features,
-          snapshotAt:  new Date(),
-        });
+        // B. pending_downgrade — apply the downgrade
+        if (sub.status === 'pending_downgrade' && sub.pendingPlanId) {
+          const newPlan = await Plan.findById(sub.pendingPlanId).session(session);
+          if (newPlan && newPlan.isActive) {
+            const latestVersion = await PlanVersion.findOne({ planId: newPlan._id }).sort({ version: -1 }).session(session);
+            const newVersion = latestVersion?.version || 1;
 
-        const now = new Date();
-        sub.planId        = newPlan._id;
-        sub.planVersionId = newPV._id;
-        sub.status        = 'active';
-        sub.pendingPlanId = null;
-        sub.cancelReason  = null;
-        sub.currentPeriodStart = now;
-        sub.currentPeriodEnd   = getPeriodEnd(now, newPlan.interval);
-        await sub.save();
+            const [newPV] = await PlanVersion.create([{
+              planId:      newPlan._id,
+              version:     newVersion + 1,
+              name:        newPlan.name,
+              displayName: newPlan.displayName,
+              price:       newPlan.price,
+              currency:    newPlan.currency,
+              interval:    newPlan.interval,
+              features:    newPlan.features,
+              snapshotAt:  new Date(),
+            }], { session });
 
-        await Promise.all([
-          Tenant.findByIdAndUpdate(sub.tenantId, { currentPlanId: newPlan._id }),
-          SubscriptionEvent.create({
-            tenantId:       sub.tenantId,
-            subscriptionId: sub._id,
-            event:          'subscription.downgrade_applied',
-            fromStatus:     'pending_downgrade',
-            toStatus:       'active',
-            toPlanId:       newPlan._id,
-            triggeredBy:    { source: 'cron' },
-          }),
-          invalidateCache(sub.tenantId.toString()),
-        ]);
-      }
-    } else {
-      // C. trialing → active (trial just ended) or D. advance renewal period
-      const fromStatus = sub.status;
-      const now = new Date();
+            const now = new Date();
+            sub.planId        = newPlan._id;
+            sub.planVersionId = newPV._id;
+            sub.status        = 'active';
+            sub.pendingPlanId = null;
+            sub.cancelReason  = null;
+            sub.currentPeriodStart = now;
+            sub.currentPeriodEnd   = getPeriodEnd(now, newPlan.interval);
+            await sub.save({ session });
 
-      const plan = await Plan.findById(sub.planId);
-      const interval = plan?.interval || 'monthly';
+            await Promise.all([
+              Tenant.findByIdAndUpdate(sub.tenantId, { currentPlanId: newPlan._id }, { session }),
+              SubscriptionEvent.create([{
+                tenantId:       sub.tenantId,
+                subscriptionId: sub._id,
+                event:          'subscription.downgrade_applied',
+                fromStatus:     'pending_downgrade',
+                toStatus:       'active',
+                toPlanId:       newPlan._id,
+                triggeredBy:    { source: 'cron' },
+              }], { session }),
+            ]);
 
-      sub.status             = 'active';
-      sub.currentPeriodStart = now;
-      sub.currentPeriodEnd   = getPeriodEnd(now, interval);
-      sub.trialEnd           = sub.status === 'trialing' ? now : sub.trialEnd;
-      await sub.save();
+            await addEventToOutbox({
+              eventType: 'subscription.renewed',
+              eventVersion: 'v1',
+              producer: 'billing-service',
+              aggregateType: 'subscription',
+              aggregateId: sub._id.toString(),
+              tenantId: sub.tenantId.toString(),
+              payload: {
+                subscriptionId: sub._id.toString(),
+                status: sub.status,
+                currentPeriodStart: sub.currentPeriodStart,
+                currentPeriodEnd: sub.currentPeriodEnd,
+                seatCount: sub.seatCount,
+                planPrice: newPlan.price,
+                planInterval: newPlan.interval,
+                currency: newPlan.currency,
+                aggregateVersion: sub.aggregateVersion
+              },
+              session
+            });
 
-      if (fromStatus === 'trialing') {
-        await SubscriptionEvent.create({
-          tenantId:       sub.tenantId,
-          subscriptionId: sub._id,
-          event:          'subscription.converted_to_paid',
-          fromStatus,
-          toStatus:       'active',
-          triggeredBy:    { source: 'cron' },
-        });
-      }
+            invalidateCache(sub.tenantId.toString());
+          }
+        } else {
+          // C. trialing → active (trial just ended) or D. advance renewal period
+          const fromStatus = sub.status;
+          const now = new Date();
 
-      await invalidateCache(sub.tenantId.toString());
+          const plan = await Plan.findById(sub.planId).session(session);
+          const interval = plan?.interval || 'monthly';
 
-      // Enqueue invoice generation for the new period
-      try {
-        const { enqueueInvoiceGeneration } = require('../queues/invoice.queue');
-        await enqueueInvoiceGeneration(sub._id.toString(), 'renewal');
-      } catch (err) {
-        logger.warn({ err: err.message, subscriptionId: sub._id }, 'Failed to enqueue renewal invoice');
-      }
+          sub.status             = 'active';
+          sub.currentPeriodStart = now;
+          sub.currentPeriodEnd   = getPeriodEnd(now, interval);
+          sub.trialEnd           = sub.status === 'trialing' ? now : sub.trialEnd;
+          await sub.save({ session });
+
+          if (fromStatus === 'trialing') {
+            await SubscriptionEvent.create([{
+              tenantId:       sub.tenantId,
+              subscriptionId: sub._id,
+              event:          'subscription.converted_to_paid',
+              fromStatus,
+              toStatus:       'active',
+              triggeredBy:    { source: 'cron' },
+            }], { session });
+          }
+
+          await addEventToOutbox({
+            eventType: 'subscription.renewed',
+            eventVersion: 'v1',
+            producer: 'billing-service',
+            aggregateType: 'subscription',
+            aggregateId: sub._id.toString(),
+            tenantId: sub.tenantId.toString(),
+            payload: {
+              subscriptionId: sub._id.toString(),
+              status: sub.status,
+              currentPeriodStart: sub.currentPeriodStart,
+              currentPeriodEnd: sub.currentPeriodEnd,
+              seatCount: sub.seatCount,
+              planPrice: plan ? plan.price : 0,
+              planInterval: interval,
+              currency: plan ? plan.currency : 'INR',
+              aggregateVersion: sub.aggregateVersion
+            },
+            session
+          });
+
+          invalidateCache(sub.tenantId.toString());
+
+          // Enqueue invoice generation for the new period
+          try {
+            const { enqueueInvoiceGeneration } = require('../queues/invoice.queue');
+            // This relies on bullmq which is outside mongoose session, so it's best done after the tx commits,
+            // however it's safe enough here because if it fails the tx still commits. Actually, better inside.
+            await enqueueInvoiceGeneration(sub._id.toString(), 'renewal');
+          } catch (err) {
+            logger.warn({ err: err.message, subscriptionId: sub._id }, 'Failed to enqueue renewal invoice');
+          }
+        }
+      });
+    } finally {
+      session.endSession();
     }
   } catch (err) {
     logger.error({ err: err.message, subscriptionId: subscription._id }, 'Error processing subscription renewal');

@@ -167,25 +167,54 @@ const generateInvoice = async (subscriptionId, triggerReason, upgradeContext = n
     // Due date = today (invoices are due immediately for SaaS)
     const dueDate = new Date();
 
-    // 7. Create Invoice in 'open' status (draft → open in one step for programmatic generation)
-    const invoice = await Invoice.create({
-      tenantId,
-      subscriptionId,
-      invoiceNumber,
-      status:    'open',
-      periodStart: currentPeriodStart,
-      periodEnd:   currentPeriodEnd,
-      dueDate,
-      lineItems,
-      subtotal,
-      taxRate:   DEFAULT_TAX_RATE,
-      taxAmount,
-      total,
-      amountPaid: 0,
-      amountDue:  total,
-      currency:   'INR',
-      metadata:   new Map([['triggerReason', triggerReason]]),
-    });
+    // 7. Create Invoice in 'open' status and emit event (Transactional)
+    const session = await mongoose.startSession();
+    let invoice;
+    try {
+      await session.withTransaction(async () => {
+        [invoice] = await Invoice.create([{
+          tenantId,
+          subscriptionId,
+          invoiceNumber,
+          status:    'open',
+          periodStart: currentPeriodStart,
+          periodEnd:   currentPeriodEnd,
+          dueDate,
+          lineItems,
+          subtotal,
+          taxRate:   DEFAULT_TAX_RATE,
+          taxAmount,
+          total,
+          amountPaid: 0,
+          amountDue:  total,
+          currency:   'INR',
+          metadata:   new Map([['triggerReason', triggerReason]]),
+        }], { session });
+
+        const { addEventToOutbox } = require('../../shared/events/outbox.helper');
+        await addEventToOutbox({
+          eventType: 'invoice.created',
+          eventVersion: 'v1',
+          producer: 'billing-service',
+          aggregateType: 'invoice',
+          aggregateId: invoice._id.toString(),
+          tenantId: tenantId.toString(),
+          payload: {
+            invoiceId: invoice._id.toString(),
+            subscriptionId: subscriptionId.toString(),
+            invoiceNumber,
+            amount: total,
+            currency: 'INR',
+            dueDate: invoice.dueDate,
+            status: 'open',
+            aggregateVersion: invoice.aggregateVersion
+          },
+          session
+        });
+      });
+    } finally {
+      session.endSession();
+    }
 
     logger.info(
       { invoiceId: invoice._id, invoiceNumber, subscriptionId, total },
@@ -367,22 +396,47 @@ const voidInvoice = async (invoiceId, reason, actorUser) => {
   }
 
   const before = invoice.toObject();
+  const session = await mongoose.startSession();
 
-  invoice.status    = 'void';
-  invoice.voidedAt  = new Date();
-  invoice.voidReason = reason || null;
-  await invoice.save();
-
-  // Resolve any active DunningRecord linked to this invoice (Phase 6 concern — stubbed here)
   try {
-    const DunningRecord = require('../../models/DunningRecord.model');
-    await DunningRecord.findOneAndUpdate(
-      { invoiceId, status: 'active' },
-      { status: 'resolved', resolvedAt: new Date() }
-    );
-  } catch (err) {
-    // DunningRecord model may not exist yet — log and continue
-    logger.warn({ err: err.message, invoiceId }, 'Failed to resolve dunning record (Phase 6 stub)');
+    await session.withTransaction(async () => {
+      invoice.status    = 'void';
+      invoice.voidedAt  = new Date();
+      invoice.voidReason = reason || null;
+      await invoice.save({ session });
+
+      // Resolve any active DunningRecord linked to this invoice (Phase 6 concern — stubbed here)
+      try {
+        const DunningRecord = require('../../models/DunningRecord.model');
+        await DunningRecord.findOneAndUpdate(
+          { invoiceId, status: 'active' },
+          { status: 'resolved', resolvedAt: new Date() },
+          { session }
+        );
+      } catch (err) {
+        // DunningRecord model may not exist yet — log and continue
+        logger.warn({ err: err.message, invoiceId }, 'Failed to resolve dunning record (Phase 6 stub)');
+      }
+
+      const { addEventToOutbox } = require('../../shared/events/outbox.helper');
+      await addEventToOutbox({
+        eventType: 'invoice.voided',
+        eventVersion: 'v1',
+        producer: 'billing-service',
+        aggregateType: 'invoice',
+        aggregateId: invoice._id.toString(),
+        tenantId: invoice.tenantId.toString(),
+        payload: {
+          invoiceId: invoice._id.toString(),
+          invoiceNumber: invoice.invoiceNumber,
+          voidReason: reason || null,
+          aggregateVersion: invoice.aggregateVersion
+        },
+        session
+      });
+    });
+  } finally {
+    session.endSession();
   }
 
   await createAuditLog({

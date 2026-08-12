@@ -73,56 +73,90 @@ const createSubscription = async (tenantId, planId, options = {}) => {
   const periodStart = now;
   const periodEnd   = trialEnd || getPeriodEnd(now, plan.interval);
 
-  const subscription = await Subscription.create({
-    tenantId,
-    planId:             plan._id,
-    planVersionId:      planVersion._id,
-    status,
-    currentPeriodStart: periodStart,
-    currentPeriodEnd:   periodEnd,
-    trialStart:         status === 'trialing' ? now : null,
-    trialEnd,
-    billingCycleAnchor: now,
-    seatCount,
-  });
+  const session = await mongoose.startSession();
+  let subscription;
 
-  // Record creation event
-  await SubscriptionEvent.create({
-    tenantId,
-    subscriptionId: subscription._id,
-    event:          status === 'trialing' ? 'subscription.trial_started' : 'subscription.created',
-    fromStatus:     null,
-    toStatus:       status,
-    toPlanId:       plan._id,
-    triggeredBy: {
-      userId: actorUser?.id || null,
-      role:   actorUser?.role || 'system',
-      source: actorUser ? 'user' : 'system',
-    },
-  });
+  try {
+    await session.withTransaction(async () => {
+      [subscription] = await Subscription.create([{
+        tenantId,
+        planId:             plan._id,
+        planVersionId:      planVersion._id,
+        status,
+        currentPeriodStart: periodStart,
+        currentPeriodEnd:   periodEnd,
+        trialStart:         status === 'trialing' ? now : null,
+        trialEnd,
+        billingCycleAnchor: now,
+        seatCount,
+      }], { session });
 
-  if (actorUser) {
-    await createAuditLog({
-      event:        'subscription.created',
-      resourceType: 'subscription',
-      resourceId:   subscription._id,
-      tenantId,
-      actor:        actorUser,
-      after:        subscription.toObject(),
+      // Record creation event
+      await SubscriptionEvent.create([{
+        tenantId,
+        subscriptionId: subscription._id,
+        event:          status === 'trialing' ? 'subscription.trial_started' : 'subscription.created',
+        fromStatus:     null,
+        toStatus:       status,
+        toPlanId:       plan._id,
+        triggeredBy: {
+          userId: actorUser?.id || null,
+          role:   actorUser?.role || 'system',
+          source: actorUser ? 'user' : 'system',
+        },
+      }], { session });
+
+      if (actorUser) {
+        await createAuditLog({
+          event:        'subscription.created',
+          resourceType: 'subscription',
+          resourceId:   subscription._id,
+          tenantId,
+          actor:        actorUser,
+          after:        subscription.toObject(),
+        }); // AuditLog service manages its own writes
+      }
+
+      // Update Tenant.currentPlanId + features so tenantScope middleware
+      // can read the correct seatLimit from tenant.features.max_seats
+      const featuresMap = new Map(Object.entries({
+        max_seats:           plan.features.max_seats,
+        api_calls_per_month: plan.features.api_calls_per_month,
+        storage_gb:          plan.features.storage_gb,
+        advanced_analytics:  plan.features.advanced_analytics,
+        ai_assistant:        plan.features.ai_assistant,
+        priority_support:    plan.features.priority_support,
+      }));
+      await identityFacade.updateTenantFeatures(tenantId, plan._id, featuresMap, session);
+
+      // Add Outbox Event for Analytics (Phase 1D)
+      await addEventToOutbox({
+        eventType: 'subscription.created',
+        eventVersion: 'v1',
+        producer: 'billing-service',
+        aggregateType: 'subscription',
+        aggregateId: subscription._id.toString(),
+        tenantId: tenantId.toString(),
+        payload: {
+          subscriptionId: subscription._id.toString(),
+          planId: plan._id.toString(),
+          status: subscription.status,
+          seatCount: subscription.seatCount,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+          planName: plan.displayName || plan.name,
+          planPrice: plan.price,
+          planInterval: plan.interval,
+          currency: plan.currency,
+          maxSeats: plan.features.max_seats,
+          aggregateVersion: subscription.aggregateVersion
+        },
+        session
+      });
     });
+  } finally {
+    session.endSession();
   }
-
-  // Update Tenant.currentPlanId + features so tenantScope middleware
-  // can read the correct seatLimit from tenant.features.max_seats
-  const featuresMap = new Map(Object.entries({
-    max_seats:           plan.features.max_seats,
-    api_calls_per_month: plan.features.api_calls_per_month,
-    storage_gb:          plan.features.storage_gb,
-    advanced_analytics:  plan.features.advanced_analytics,
-    ai_assistant:        plan.features.ai_assistant,
-    priority_support:    plan.features.priority_support,
-  }));
-  await identityFacade.updateTenantFeatures(tenantId, plan._id, featuresMap);
 
   await invalidateTenantCache(tenantId.toString());
 
@@ -364,6 +398,8 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
 
       await addEventToOutbox({
         eventType: 'subscription.upgraded',
+        eventVersion: 'v1',
+        producer: 'billing-service',
         aggregateType: 'subscription',
         aggregateId: subscription._id.toString(),
         tenantId: tenantId.toString(),
@@ -379,7 +415,15 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
             advanced_analytics: targetPlan.features.advanced_analytics,
             ai_assistant: targetPlan.features.ai_assistant,
             priority_support: targetPlan.features.priority_support,
-          }
+          },
+          seatCount: subscription.seatCount,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+          planName: targetPlan.displayName || targetPlan.name,
+          planPrice: targetPlan.price,
+          planInterval: targetPlan.interval,
+          currency: targetPlan.currency,
+          aggregateVersion: subscription.aggregateVersion
         },
         session,
       });
@@ -575,35 +619,58 @@ const cancelSubscription = async (tenantId, { cancelAtPeriodEnd = true, reason }
   const fromStatus = subscription.status;
   const now = new Date();
 
-  subscription.cancelReason = reason || null;
-  subscription.cancelledAt  = cancelAtPeriodEnd ? null : now;
-  subscription.cancelAtPeriodEnd = cancelAtPeriodEnd;
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      subscription.cancelReason = reason || null;
+      subscription.cancelledAt  = cancelAtPeriodEnd ? null : now;
+      subscription.cancelAtPeriodEnd = cancelAtPeriodEnd;
 
-  if (!cancelAtPeriodEnd) {
-    subscription.status = 'cancelled';
-    // Immediate cancellation → update tenant status
-    await identityFacade.updateTenantStatus(tenantId, 'cancelled');
+      if (!cancelAtPeriodEnd) {
+        subscription.status = 'cancelled';
+        // Immediate cancellation → update tenant status (outside transaction, since facade doesn't support session)
+        await identityFacade.updateTenantStatus(tenantId, 'cancelled');
+      }
+
+      await subscription.save({ session });
+
+      await SubscriptionEvent.create([{
+        tenantId,
+        subscriptionId: subscription._id,
+        event:          'subscription.cancelled',
+        fromStatus,
+        toStatus:       subscription.status,
+        triggeredBy:    { userId: actorUser.id, role: actorUser.role, source: 'user' },
+        metadata:       new Map([['cancelAtPeriodEnd', cancelAtPeriodEnd], ['reason', reason || '']]),
+      }], { session });
+
+      await createAuditLog({
+        event: 'subscription.cancelled', resourceType: 'subscription',
+        resourceId: subscription._id, tenantId, actor: actorUser,
+        before: { status: fromStatus }, after: { status: subscription.status, cancelAtPeriodEnd },
+      }); // AuditLog handles its own writes
+
+      await addEventToOutbox({
+        eventType: 'subscription.cancelled',
+        eventVersion: 'v1',
+        producer: 'billing-service',
+        aggregateType: 'subscription',
+        aggregateId: subscription._id.toString(),
+        tenantId: tenantId.toString(),
+        payload: {
+          subscriptionId: subscription._id.toString(),
+          cancelAtPeriodEnd,
+          cancellationReason: reason || null,
+          aggregateVersion: subscription.aggregateVersion
+        },
+        session
+      });
+    });
+  } finally {
+    session.endSession();
   }
 
-  await subscription.save();
-
-  await Promise.all([
-    SubscriptionEvent.create({
-      tenantId,
-      subscriptionId: subscription._id,
-      event:          'subscription.cancelled',
-      fromStatus,
-      toStatus:       subscription.status,
-      triggeredBy:    { userId: actorUser.id, role: actorUser.role, source: 'user' },
-      metadata:       new Map([['cancelAtPeriodEnd', cancelAtPeriodEnd], ['reason', reason || '']]),
-    }),
-    createAuditLog({
-      event: 'subscription.cancelled', resourceType: 'subscription',
-      resourceId: subscription._id, tenantId, actor: actorUser,
-      before: { status: fromStatus }, after: { status: subscription.status, cancelAtPeriodEnd },
-    }),
-    invalidateTenantCache(tenantId.toString()),
-  ]);
+  await invalidateTenantCache(tenantId.toString());
 
   return subscription.toObject();
 };

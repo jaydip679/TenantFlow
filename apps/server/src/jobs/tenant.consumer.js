@@ -43,12 +43,15 @@ const handleDunningAbandoned = async (envelope) => {
         // 3. Emit Domain Event: tenant.suspended
         await addEventToOutbox({
           eventType: 'tenant.suspended',
+          eventVersion: 'v1',
+          producer: 'identity-service',
           aggregateType: 'tenant',
           aggregateId: tenantId,
           tenantId,
           payload: {
             reason: 'dunning_abandoned',
             dunningRecordId: payload.dunningRecordId,
+            aggregateVersion: tenant.aggregateVersion,
           },
           session,
         });
@@ -96,6 +99,8 @@ const handleInvoicePaid = async (envelope) => {
         // 3. Emit Domain Event: tenant.restored
         await addEventToOutbox({
           eventType: 'tenant.restored',
+          eventVersion: 'v1',
+          producer: 'identity-service',
           aggregateType: 'tenant',
           aggregateId: tenantId,
           tenantId,
@@ -103,6 +108,7 @@ const handleInvoicePaid = async (envelope) => {
             reason: 'invoice_paid',
             invoiceId: payload.invoiceId,
             paymentId: payload.paymentId,
+            aggregateVersion: tenant.aggregateVersion,
           },
           session,
         });
