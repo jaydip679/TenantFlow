@@ -47,8 +47,21 @@ pdfQueue.on('error', (err) => {
  * @returns {Promise<import('bullmq').Job>}
  */
 const enqueuePdfGeneration = async (invoiceId) => {
+  const Invoice = require('../modules/invoices/Invoice.model');
+  const Subscription = require('../modules/subscriptions/Subscription.model');
+  const identityFacade = require('../modules/admin/identity.facade');
+
+  const invoice = await Invoice.findById(invoiceId).lean();
+  if (!invoice) throw new Error(`Invoice not found: ${invoiceId}`);
+
+  const [tenant, subscription] = await Promise.all([
+    identityFacade.getTenantBillingProfile(invoice.tenantId),
+    Subscription.findById(invoice.subscriptionId).lean(),
+  ]);
+
+  const invoiceData = { invoice, tenant, subscription };
   const jobId = `pdf:${invoiceId}:${Date.now()}`;
-  return pdfQueue.add('generate-pdf', { invoiceId }, { jobId });
+  return pdfQueue.add('generate-pdf', { invoiceId, invoiceData }, { jobId });
 };
 
 module.exports = { pdfQueue, enqueuePdfGeneration, QUEUE_NAME };

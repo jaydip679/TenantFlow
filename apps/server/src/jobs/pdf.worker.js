@@ -17,24 +17,74 @@ const { bullmqConnection } = require('../config/bullmq');
 const logger               = require('../shared/utils/logger');
 const { QUEUE_NAME }       = require('../queues/pdf.queue');
 
+const { generateInvoicePdf } = require('../modules/invoices/invoice.pdf.template');
+const { cloudinaryUpload } = require('../config/cloudinary');
+const redisClient = require('../config/redis');
+
+/**
+ * Upload a PDF buffer to Cloudinary.
+ */
+const uploadPdfToCloudinary = async (pdfBuffer, tenantId, invoiceId) => {
+  return new Promise((resolve, reject) => {
+    cloudinaryUpload(pdfBuffer, {
+      folder: `tenantflow/invoices/${tenantId}`,
+      public_id: invoiceId,
+      format: 'pdf',
+      resource_type: 'raw',
+    })
+      .then(res => resolve(res.secure_url))
+      .catch(reject);
+  });
+};
+
 /**
  * Process a single PDF generation job.
- * @param {import('bullmq').Job} job
  */
 const processPdfJob = async (job) => {
-  const { invoiceId } = job.data;
+  const { invoiceId, invoiceData } = job.data;
+  const { invoice, tenant, subscription } = invoiceData;
 
   logger.info({ jobId: job.id, invoiceId }, 'Processing PDF job');
 
-  const invoiceService = require('../modules/invoices/invoice.service');
-  const invoice = await invoiceService.generatePdf(invoiceId);
+  // 1. Render PDF buffer
+  const pdfBuffer = await generateInvoicePdf(invoice, tenant, subscription);
 
-  logger.info(
-    { jobId: job.id, invoiceId, pdfUrl: invoice.pdfUrl },
-    'PDF job completed'
+  // 2. Upload to Cloudinary
+  const pdfUrl = await uploadPdfToCloudinary(pdfBuffer, invoice.tenantId.toString(), invoice._id.toString());
+  logger.info({ invoiceId, pdfUrl }, 'PDF generated and uploaded to Cloudinary');
+
+  // 3. Emit pdf.generated event
+  const eventId = `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const eventPayload = {
+    eventId,
+    eventType: 'pdf.generated',
+    eventVersion: 'v1',
+    producer: 'billing-service-worker',
+    aggregateType: 'invoice',
+    aggregateId: invoiceId.toString(),
+    timestamp: new Date().toISOString(),
+    payload: JSON.stringify({
+      invoiceId: invoiceId.toString(),
+      pdfUrl,
+    }),
+  };
+
+  await redisClient.xadd(
+    'tenantflow:events',
+    '*',
+    'eventId', eventPayload.eventId,
+    'eventType', eventPayload.eventType,
+    'eventVersion', eventPayload.eventVersion,
+    'producer', eventPayload.producer,
+    'aggregateType', eventPayload.aggregateType,
+    'aggregateId', eventPayload.aggregateId,
+    'timestamp', eventPayload.timestamp,
+    'payload', eventPayload.payload
   );
 
-  return { invoiceId, pdfUrl: invoice.pdfUrl };
+  logger.info({ eventId, invoiceId }, 'Published pdf.generated event');
+
+  return { invoiceId, pdfUrl };
 };
 
 // ── Worker Instance ───────────────────────────────────────────
@@ -61,4 +111,4 @@ pdfWorker.on('error', (err) => {
   logger.error({ err: err.message }, 'PDF worker error');
 });
 
-module.exports = { pdfWorker };
+module.exports = { pdfWorker, processPdfJob };

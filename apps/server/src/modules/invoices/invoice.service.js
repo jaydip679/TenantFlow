@@ -56,32 +56,6 @@ const releaseLock = async (lockKey) => {
   );
 };
 
-// ── Cloudinary Upload ──────────────────────────────────────────
-/**
- * Upload a PDF buffer to Cloudinary.
- * Returns the secure URL.
- */
-const uploadPdfToCloudinary = async (pdfBuffer, tenantId, invoiceId) => {
-  const cloudinary = require('../../config/cloudinary');
-  const publicId   = `invoices/${tenantId}/${invoiceId}`;
-
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        resource_type: 'raw',
-        public_id:     publicId,
-        format:        'pdf',
-        folder:        'tenantflow',
-      },
-      (err, result) => {
-        if (err) return reject(err);
-        resolve(result.secure_url);
-      }
-    );
-    uploadStream.end(pdfBuffer);
-  });
-};
-
 // ── generateInvoice() ──────────────────────────────────────────
 /**
  * Generate an invoice for a subscription billing event.
@@ -247,75 +221,7 @@ const generateInvoice = async (subscriptionId, triggerReason, upgradeContext = n
   }
 };
 
-// ── generatePdf() ──────────────────────────────────────────────
-/**
- * Generate a PDF for an invoice and upload to Cloudinary.
- * Called by pdf.worker.js ONLY.
- *
- * Steps:
- *   1. Load invoice + tenant + subscription
- *   2. Render PDF buffer using PDFKit
- *   3. Upload to Cloudinary: tenantflow/invoices/{tenantId}/{invoiceId}.pdf
- *   4. Update Invoice.pdfUrl
- *   5. Enqueue email: type='invoice_generated'
- *
- * @param {string} invoiceId
- * @returns {Promise<Invoice>} Updated invoice with pdfUrl set
- */
-const generatePdf = async (invoiceId) => {
-  // 1. Load all needed documents in parallel
-  const invoice = await Invoice.findById(invoiceId);
-  if (!invoice) throw new AppError('Invoice not found.', 404, ERROR_CODES.INVOICE_NOT_FOUND);
 
-  const [tenant, subscription] = await Promise.all([
-    identityFacade.getTenantBillingProfile(invoice.tenantId),
-    Subscription.findById(invoice.subscriptionId).lean(),
-  ]);
-
-  // 2. Render PDF buffer
-  logger.info({ invoiceId, invoiceNumber: invoice.invoiceNumber }, 'Generating PDF...');
-  const pdfBuffer = await generateInvoicePdf(invoice, tenant, subscription);
-
-  // 3. Upload to Cloudinary
-  let pdfUrl;
-  try {
-    pdfUrl = await uploadPdfToCloudinary(pdfBuffer, invoice.tenantId.toString(), invoice._id.toString());
-  } catch (err) {
-    logger.error({ err: err.message, invoiceId }, 'Cloudinary PDF upload failed');
-    throw err;
-  }
-
-  // 4. Update Invoice.pdfUrl
-  invoice.pdfUrl = pdfUrl;
-  await invoice.save();
-
-  logger.info({ invoiceId, pdfUrl }, 'PDF generated and uploaded to Cloudinary');
-
-  // 5. Enqueue invoice email (to tenant billing contact)
-  try {
-    const billingEmail = tenant.billingEmail || tenant.email;
-    if (billingEmail) {
-      await enqueueEmail({
-        type:          'invoice_generated',
-        to:            billingEmail,
-        firstName:     tenant.name,
-        templateVars: {
-          invoiceNumber: invoice.invoiceNumber,
-          total:         invoice.total,
-          amountDue:     invoice.amountDue,
-          dueDate:       invoice.dueDate,
-          pdfUrl,
-          tenantName:    tenant.name,
-        },
-      });
-    }
-  } catch (err) {
-    // Email failure should not fail PDF generation
-    logger.warn({ err: err.message, invoiceId }, 'Failed to enqueue invoice email');
-  }
-
-  return invoice;
-};
 
 // ── Public CRUD Methods ────────────────────────────────────────
 
@@ -530,7 +436,6 @@ const listAllInvoices = async (filters = {}, options = {}) => {
 
 module.exports = {
   generateInvoice,
-  generatePdf,
   getInvoice,
   listInvoices,
   voidInvoice,
