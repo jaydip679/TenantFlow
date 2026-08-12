@@ -195,8 +195,37 @@ const dunningRoutes = require('./modules/payments/dunning.routes');
 app.use('/api/v1/admin/dunning', dunningRoutes);
 
 // Phase 7 — Notifications
-const notificationRoutes = require('./modules/notifications/notification.routes');
-app.use('/api/v1/notifications', notificationRoutes);
+if (process.env.ENABLE_MONOLITH_NOTIFICATION_WORKER !== 'false') {
+  const notificationRoutes = require('./modules/notifications/notification.routes');
+  app.use('/api/v1/notifications', notificationRoutes);
+} else {
+  // Proxy to Platform Service
+  const { createProxyMiddleware } = require('http-proxy-middleware');
+  const { authenticate } = require('./shared/middleware/authenticate.middleware');
+  
+  // We apply authenticate first to populate req.user, then proxy and pass headers
+  app.use(
+    '/api/v1/notifications',
+    authenticate,
+    createProxyMiddleware({
+      target: process.env.PLATFORM_SERVICE_URL || 'http://localhost:3001',
+      changeOrigin: true,
+      on: {
+        proxyReq: (proxyReq, req, res) => {
+          if (req.user) {
+            proxyReq.setHeader('x-user-id', req.user.id);
+            if (req.user.tenantId) {
+              proxyReq.setHeader('x-tenant-id', req.user.tenantId.toString());
+            }
+            if (req.user.role) {
+              proxyReq.setHeader('x-user-role', req.user.role);
+            }
+          }
+        }
+      }
+    })
+  );
+}
 
 // Phase 8 — AI Integration
 const aiRoutes = require('./modules/ai/ai.routes');

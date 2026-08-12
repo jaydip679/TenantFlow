@@ -42,15 +42,29 @@ const startServer = async () => {
 
   // ── Start BullMQ Workers ────────────────────────────────────────
   // Workers must start after DB + Redis are healthy
-  require('./jobs/email.worker');
-  logger.info('Email worker started');
+  if (process.env.ENABLE_MONOLITH_EMAIL_WORKER !== 'false') {
+    require('./jobs/email.worker');
+    logger.info('Email worker started');
+  } else {
+    logger.info('Email worker disabled (running in platform-service)');
+  }
 
   // Phase 4 workers
   require('./jobs/invoice.worker');
   logger.info('Invoice worker started');
 
-  require('./jobs/pdf.worker');
-  logger.info('PDF worker started');
+  if (process.env.ENABLE_MONOLITH_PDF_WORKER !== 'false') {
+    require('./jobs/pdf.worker');
+    logger.info('PDF worker started');
+  } else {
+    logger.info('PDF worker disabled (running in platform-service)');
+  }
+
+  const { startInvoiceConsumer } = require('./modules/invoices/consumers/invoice.consumer');
+  await startInvoiceConsumer();
+
+  const { startNotificationConsumer } = require('./modules/notifications/consumers/notification.consumer');
+  await startNotificationConsumer();
 
   // Phase 4 — Billing Renewal Cron (daily at 01:00 UTC)
   const { initBillingRenewCron } = require('./cron/billingRenew.cron');
@@ -90,8 +104,12 @@ const startServer = async () => {
   logger.info('Socket.IO initialized');
 
   // Phase 7 workers
-  require('./jobs/notification.worker');
-  logger.info('Notification worker started');
+  if (process.env.ENABLE_MONOLITH_NOTIFICATION_WORKER !== 'false') {
+    require('./jobs/notification.worker');
+    logger.info('Notification worker started');
+  } else {
+    logger.info('Notification worker disabled (running in platform-service)');
+  }
 
   // Phase 8 workers
   require('./jobs/ai.worker');
@@ -133,6 +151,12 @@ const startServer = async () => {
 
         const { stopAnalyticsConsumer } = require('./modules/analytics/consumers/analytics.consumer');
         await stopAnalyticsConsumer();
+
+        const { stopInvoiceConsumer } = require('./modules/invoices/consumers/invoice.consumer');
+        await stopInvoiceConsumer();
+
+        const { stopNotificationConsumer } = require('./modules/notifications/consumers/notification.consumer');
+        await stopNotificationConsumer();
 
         const mongoose = require('mongoose');
         await mongoose.connection.close();
