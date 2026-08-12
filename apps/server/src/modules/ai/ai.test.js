@@ -81,6 +81,11 @@ const { CHURN_ANALYSIS_PROMPT, BILLING_ASSISTANT_SYSTEM_PROMPT } = require('./ai
 const aiService        = require('./ai.service');
 const { ERROR_CODES }  = require('../../shared/errors/errorCodes');
 
+beforeAll(() => {
+  process.env.AI_PROVIDER = 'openai';
+  process.env.OPENAI_API_KEY = 'test-key';
+});
+
 beforeEach(() => jest.clearAllMocks());
 
 // ── ai.prompts ────────────────────────────────────────────────

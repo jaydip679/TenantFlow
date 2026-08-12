@@ -89,6 +89,7 @@ describe('Identity Tenant Consumer', () => {
     // OutboxEvent tenant.suspended should be created
     const outboxEvents = await OutboxEvent.find({ eventType: 'tenant.suspended' });
     expect(outboxEvents.length).toBe(1);
+    expect(outboxEvents[0].payload.aggregateVersion).toBeDefined();
 
     // Second delivery (duplicate)
     await handler(envelope);
@@ -119,7 +120,8 @@ describe('Identity Tenant Consumer', () => {
     expect(processed.length).toBe(1); // Only one success
 
     const outboxEvents = await OutboxEvent.find({ eventType: 'tenant.restored' });
-    expect(outboxEvents.length).toBe(1); // Only emitted once
+    expect(outboxEvents.length).toBe(1);
+    expect(outboxEvents[0].payload.aggregateVersion).toBeDefined(); // Only emitted once
   });
 
   it('3. Tenant update succeeds but processed-event insert fails -> entire Identity transaction rolls back', async () => {

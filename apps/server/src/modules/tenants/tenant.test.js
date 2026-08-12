@@ -28,6 +28,18 @@ jest.mock('../../config/cloudinary', () => ({
   cloudinaryUpload: jest.fn().mockResolvedValue({ secure_url: 'https://cdn.cloudinary.com/test.webp' }),
   cloudinaryDelete: jest.fn().mockResolvedValue({}),
 }));
+jest.mock('../../shared/events/outbox.helper', () => ({ addEventToOutbox: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('mongoose', () => {
+  const actual = jest.requireActual('mongoose');
+  return {
+    ...actual,
+    startSession: jest.fn().mockResolvedValue({
+      withTransaction: jest.fn(async (fn) => { await fn(); }),
+      endSession:      jest.fn(),
+    }),
+    Types: actual.Types,
+  };
+});
 
 const Tenant        = require('../../models/Tenant.model');
 const User          = require('../../models/User.model');
@@ -58,7 +70,7 @@ const makeUser = (o = {}) => ({
   inviteToken:     null,
   inviteExpiresAt: new Date(Date.now() + 86400000),
   passwordHash:    'hashed',
-  save:            jest.fn().mockResolvedValue(undefined),
+  save:            jest.fn().mockResolvedValue(true),
   ...o,
 });
 
@@ -125,7 +137,7 @@ describe('tenantService.inviteMember()', () => {
 
   it('creates invited user and enqueues email', async () => {
     User.findOne = jest.fn().mockResolvedValue(null); // No existing user
-    User.create  = jest.fn().mockResolvedValue(makeUser({ status: 'invited' }));
+    User.create  = jest.fn().mockResolvedValue([makeUser({ status: 'invited' })]);
     // findById().select().lean() chain
     User.findById = jest.fn().mockReturnValue({
       select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ firstName: 'Admin', lastName: 'User' }) }),
@@ -137,7 +149,8 @@ describe('tenantService.inviteMember()', () => {
     const result = await tenantService.inviteMember('tenant-id-1', 'new@acme.com', 'tenant_member', actor, baseTenantCtx);
 
     expect(User.create).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'invited', role: 'tenant_member' })
+      [expect.objectContaining({ status: 'invited', role: 'tenant_member' })],
+      expect.objectContaining({ session: expect.anything() })
     );
     const { enqueueEmail } = require('../../queues/email.queue');
     expect(enqueueEmail).toHaveBeenCalledWith(
@@ -177,10 +190,9 @@ describe('tenantService.removeMember()', () => {
 
     await tenantService.removeMember('tenant-id-1', 'member-id', actor);
 
-    expect(User.findByIdAndUpdate).toHaveBeenCalledWith(
-      'member-id',
-      expect.objectContaining({ status: 'deleted' })
-    );
+    const targetUser = await User.findOne({ _id: 'member-id' });
+    expect(targetUser.status).toBe('deleted');
+    expect(targetUser.save).toHaveBeenCalled();
   });
 });
 

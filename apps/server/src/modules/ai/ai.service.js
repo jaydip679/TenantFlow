@@ -390,11 +390,32 @@ const getAllChurnScores = async (options = {}) => {
  */
 const chatWithBillingAssistant = async (tenantId, message, conversationHistory = []) => {
   // Load tenant billing context
-  const [tenant, subscription, recentInvoices] = await Promise.all([
-    Tenant.findById(tenantId).select('name status').lean(),
-    Subscription.findOne({ tenantId }).populate('planVersionId', 'name maxSeats').lean(),
-    Invoice.find({ tenantId }).sort({ createdAt: -1 }).limit(3).lean(),
-  ]);
+  let tenant, subscription, recentInvoices;
+
+  if (process.env.USE_ANALYTICS_READ_MODELS === 'true') {
+    const ReadTenant = require('../../modules/analytics/models/ReadTenant.model');
+    const ReadSubscription = require('../../modules/analytics/models/ReadSubscription.model');
+    const ReadInvoice = require('../../modules/analytics/models/ReadInvoice.model');
+
+    const [readTenant, readSub, readInvs] = await Promise.all([
+      ReadTenant.findOne({ tenantId }).lean(),
+      ReadSubscription.findOne({ tenantId }).lean(),
+      ReadInvoice.find({ tenantId }).sort({ createdAt: -1 }).limit(3).lean(),
+    ]);
+
+    tenant = readTenant;
+    subscription = readSub;
+    if (subscription) {
+      subscription.planVersionId = { name: readSub.planName, maxSeats: readSub.maxSeats };
+    }
+    recentInvoices = readInvs;
+  } else {
+    [tenant, subscription, recentInvoices] = await Promise.all([
+      Tenant.findById(tenantId).select('name status').lean(),
+      Subscription.findOne({ tenantId }).populate('planVersionId', 'name maxSeats').lean(),
+      Invoice.find({ tenantId }).sort({ createdAt: -1 }).limit(3).lean(),
+    ]);
+  }
 
   // Extract plan from populated planVersionId
   const plan = subscription?.planVersionId || null;

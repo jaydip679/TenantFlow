@@ -36,6 +36,18 @@ jest.mock('../../shared/utils/invoiceNumber', () => ({ generateInvoiceNumber: je
 jest.mock('../../queues/email.queue', () => ({ enqueueEmail: jest.fn().mockResolvedValue({}) }));
 // Stub pdf.queue — it's required lazily inside generateInvoice
 jest.mock('../../queues/pdf.queue', () => ({ enqueuePdfGeneration: jest.fn().mockResolvedValue({}) }), { virtual: false });
+jest.mock('../../shared/events/outbox.helper', () => ({ addEventToOutbox: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('mongoose', () => {
+  const actual = jest.requireActual('mongoose');
+  return {
+    ...actual,
+    startSession: jest.fn().mockResolvedValue({
+      withTransaction: jest.fn(async (fn) => { await fn(); }),
+      endSession:      jest.fn(),
+    }),
+    Types: actual.Types,
+  };
+});
 
 const Invoice      = require('../../models/Invoice.model');
 const Subscription = require('../../models/Subscription.model');
@@ -208,18 +220,19 @@ describe('invoiceService.generateInvoice()', () => {
     identityFacade.getPlanVersion = jest.fn().mockResolvedValue(makePlanVersion());
 
     const createdInvoice = makeInvoice();
-    Invoice.create = jest.fn().mockResolvedValue(createdInvoice);
+    Invoice.create = jest.fn().mockResolvedValue([createdInvoice]);
 
     const result = await invoiceService.generateInvoice('sub-id-1', 'renewal');
 
     expect(Invoice.create).toHaveBeenCalledTimes(1);
     expect(Invoice.create).toHaveBeenCalledWith(
-      expect.objectContaining({
+      [expect.objectContaining({
         tenantId:      sub.tenantId,
         subscriptionId: sub._id,
         invoiceNumber:  'INV-2024-00001',
         status:         'open',
-      })
+      })],
+      expect.objectContaining({ session: expect.anything() })
     );
     expect(result).toBe(createdInvoice);
   });

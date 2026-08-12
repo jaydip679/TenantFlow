@@ -252,6 +252,79 @@ const getPlatformMetrics = async () => {
  */
 const listTenants = async (filters = {}, options = {}) => {
   const { page, limit, skip } = parsePagination(options);
+
+  if (process.env.USE_ANALYTICS_READ_MODELS === 'true') {
+    const ReadTenant = require('../../modules/analytics/models/ReadTenant.model');
+    const matchStage = {};
+    if (filters.status) matchStage.status = filters.status;
+    // Risk level filter cannot be supported safely without joining ChurnScore which is not in Read Models yet
+    // PlanVersionId filter cannot be supported exactly as planVersionId is not in Read Models.
+    // We defer those filters when using ReadModels, or we can use aggregation.
+    
+    const pipeline = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'analytics_read_subscriptions',
+          localField: 'tenantId',
+          foreignField: 'tenantId',
+          as: 'subscription',
+        },
+      },
+      { $unwind: { path: '$subscription', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'tenantchurnscores',
+          localField: 'tenantId',
+          foreignField: 'tenantId',
+          as: 'churnScore',
+        },
+      },
+      { $unwind: { path: '$churnScore', preserveNullAndEmptyArrays: true } },
+      ...(filters.riskLevel ? [{ $match: { 'churnScore.riskLevel': filters.riskLevel } }] : []),
+      {
+        $project: {
+          _id: 0,
+          id: '$tenantId',
+          name: 1,
+          slug: 1,
+          status: 1,
+          createdAt: 1,
+          subscriptionStatus: { $ifNull: ['$subscription.status', null] },
+          planName:           { $ifNull: ['$subscription.planName', null] },
+          planInterval:       { $ifNull: ['$subscription.planInterval', null] },
+          mrrContributionPaise: {
+            $cond: [
+              { $eq: ['$subscription.planInterval', 'annual'] },
+              { $divide: [{ $ifNull: ['$subscription.planPrice', 0] }, 12] },
+              { $ifNull: ['$subscription.planPrice', 0] },
+            ],
+          },
+          usedSeats:          { $ifNull: ['$subscription.seatCount', 0] },
+          totalSeats:         { $ifNull: ['$subscription.maxSeats', 0] },
+          churnRiskScore:     { $ifNull: ['$churnScore.churnRiskScore', null] },
+          riskLevel:          { $ifNull: ['$churnScore.riskLevel', null] },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ];
+
+    const [tenants, countResult] = await Promise.all([
+      ReadTenant.aggregate([...pipeline, { $skip: skip }, { $limit: limit }]),
+      ReadTenant.aggregate([...pipeline, { $count: 'total' }]),
+    ]);
+
+    // Format output to match legacy exactly (legacy returned _id)
+    const formattedTenants = tenants.map(t => {
+      const formatted = { ...t, _id: new mongoose.Types.ObjectId(t.id) };
+      delete formatted.id;
+      return formatted;
+    });
+
+    const total = countResult[0]?.total || 0;
+    return { tenants: formattedTenants, pagination: paginationMeta(total, page, limit) };
+  }
+
   const matchStage = {};
   if (filters.status) matchStage.status = filters.status;
 
@@ -335,6 +408,51 @@ const listTenants = async (filters = {}, options = {}) => {
  * @returns {Promise<Object>}
  */
 const getTenantDetail = async (tenantId) => {
+  if (process.env.USE_ANALYTICS_READ_MODELS === 'true') {
+    const ReadTenant = require('../../modules/analytics/models/ReadTenant.model');
+    const ReadInvoice = require('../../modules/analytics/models/ReadInvoice.model');
+    const ReadSubscription = require('../../modules/analytics/models/ReadSubscription.model');
+
+    const [readTenant, members, readInvoices, events, churnScore, readSub] = await Promise.all([
+      ReadTenant.findOne({ tenantId }).lean(),
+      User.find({ tenantId, deletedAt: null })
+        .select('name email role status lastLoginAt createdAt')
+        .sort({ createdAt: 1 })
+        .lean(),
+      ReadInvoice.find({ tenantId })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      SubscriptionEvent.find({ tenantId })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean(),
+      TenantChurnScore.findOne({ tenantId }).lean(),
+      ReadSubscription.findOne({ tenantId }).lean(),
+    ]);
+
+    if (!readTenant) {
+      throw new AppError('Tenant not found.', 404, ERROR_CODES.TENANT_NOT_FOUND);
+    }
+
+    const tenant = { ...readTenant, _id: new mongoose.Types.ObjectId(readTenant.tenantId), billingEmail: readTenant.ownerEmail };
+    const invoices = readInvoices.map(inv => ({ ...inv, _id: new mongoose.Types.ObjectId(inv.invoiceId) }));
+    let subscription = null;
+    if (readSub) {
+      subscription = {
+        ...readSub,
+        _id: new mongoose.Types.ObjectId(readSub.subscriptionId),
+        planVersionId: {
+          name: readSub.planName,
+          interval: readSub.planInterval,
+          price: readSub.planPrice
+        }
+      };
+    }
+
+    return { tenant, subscription, members, recentInvoices: invoices, eventTimeline: events, churnScore };
+  }
+
   const [tenant, members, invoices, events, churnScore, subscription] = await Promise.all([
     Tenant.findById(tenantId).lean(),
     User.find({ tenantId, deletedAt: null })
@@ -418,6 +536,58 @@ const listAllInvoices = async (filters = {}, options = {}) => {
   const filter = {};
   if (filters.status)   filter.status   = filters.status;
   if (filters.tenantId) filter.tenantId = filters.tenantId;
+
+  if (process.env.USE_ANALYTICS_READ_MODELS === 'true') {
+    const ReadInvoice = require('../../modules/analytics/models/ReadInvoice.model');
+    
+    const pipeline = [
+      { $match: filter },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: 'analytics_read_tenants',
+          localField: 'tenantId',
+          foreignField: 'tenantId',
+          as: 'tenant'
+        }
+      },
+      { $unwind: { path: '$tenant', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          invoiceId: 1,
+          tenantId: {
+            _id: '$tenantId',
+            name: '$tenant.name',
+            slug: '$tenant.slug'
+          },
+          status: 1,
+          invoiceNumber: 1,
+          total: 1,
+          amountDue: 1,
+          dueDate: 1,
+          amountPaid: 1,
+          paidAt: 1,
+          currency: 1,
+          createdAt: 1
+        }
+      }
+    ];
+
+    const [invoices, totalCount] = await Promise.all([
+      ReadInvoice.aggregate(pipeline),
+      ReadInvoice.countDocuments(filter),
+    ]);
+
+    const formattedInvoices = invoices.map(inv => ({
+      ...inv,
+      _id: new mongoose.Types.ObjectId(inv.invoiceId)
+    }));
+
+    return { invoices: formattedInvoices, pagination: paginationMeta(totalCount, page, limit) };
+  }
 
   const [invoices, total] = await Promise.all([
     Invoice.find(filter)

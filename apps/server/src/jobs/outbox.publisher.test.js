@@ -46,6 +46,7 @@ describe('Outbox Publisher Daemon', () => {
     const event = await OutboxEvent.create({
       eventId: new mongoose.Types.ObjectId().toString(),
       eventType: 'test.event',
+      eventVersion: 'v1',
       producer: 'test',
       aggregateType: 'test',
       aggregateId: 'test',
@@ -99,6 +100,7 @@ describe('Outbox Publisher Daemon', () => {
     const event = await OutboxEvent.create({
       eventId: new mongoose.Types.ObjectId().toString(),
       eventType: 'test.event',
+      eventVersion: 'v1',
       producer: 'test',
       aggregateType: 'test',
       aggregateId: 'test',
@@ -121,6 +123,7 @@ describe('Outbox Publisher Daemon', () => {
     const event = await OutboxEvent.create({
       eventId: new mongoose.Types.ObjectId().toString(),
       eventType: 'test.event',
+      eventVersion: 'v1',
       producer: 'test',
       aggregateType: 'test',
       aggregateId: 'test',
@@ -145,6 +148,7 @@ describe('Outbox Publisher Daemon', () => {
     const event = await OutboxEvent.create({
       eventId: new mongoose.Types.ObjectId().toString(),
       eventType: 'test.fail',
+      eventVersion: 'v1',
       producer: 'test',
       aggregateType: 'test',
       aggregateId: 'test',
