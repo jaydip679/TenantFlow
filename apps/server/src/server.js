@@ -75,6 +75,10 @@ const startServer = async () => {
   const { startTenantConsumer } = require('./jobs/tenant.consumer');
   await startTenantConsumer();
 
+  // Phase 1D-C — Analytics Consumer
+  const { startAnalyticsConsumer } = require('./modules/analytics/consumers/analytics.consumer');
+  await startAnalyticsConsumer();
+
   // ── Create HTTP server ──────────────────────────────
   // MUST be created before Socket.IO initialization (Phase 7)
   const server = http.createServer(app);
@@ -126,6 +130,9 @@ const startServer = async () => {
         
         const { stopTenantConsumer } = require('./jobs/tenant.consumer');
         await stopTenantConsumer();
+
+        const { stopAnalyticsConsumer } = require('./modules/analytics/consumers/analytics.consumer');
+        await stopAnalyticsConsumer();
 
         const mongoose = require('mongoose');
         await mongoose.connection.close();
