@@ -89,8 +89,8 @@ const sendInvoiceEmail = asyncHandler(async (req, res) => {
   );
 
   const { enqueueEmail } = require('../../queues/email.queue');
-  const Tenant = require('../../models/Tenant.model');
-  const tenant = await Tenant.findById(invoice.tenantId).select('name billingEmail').lean();
+  const identityFacade = require('../../shared/facades/identity.facade');
+  const tenant = await identityFacade.getTenantBillingProfile(invoice.tenantId);
 
   await enqueueEmail({
     type:    'invoice_generated',

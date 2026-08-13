@@ -23,9 +23,8 @@
 
 const { subDays, differenceInDays, differenceInMonths } = require('date-fns');
 const TenantChurnScore = require('../../models/TenantChurnScore.model');
-const Tenant           = require('../../models/Tenant.model');
+const identityFacade   = require('../../shared/facades/identity.facade');
 const Subscription     = require('../../models/Subscription.model');
-const Plan             = require('../../models/Plan.model');
 const Invoice          = require('../../models/Invoice.model');
 const AuditLog         = require('../../models/AuditLog.model');
 const { AppError }     = require('../../shared/errors/AppError');
@@ -133,7 +132,7 @@ const computeChurnSignals = async (tenantId) => {
       .lean(),
 
     // Tenant base info
-    Tenant.findById(tenantId).select('createdAt name').lean(),
+    identityFacade.getTenantBillingProfile(tenantId),
   ]);
 
   const planName      = subscription?.planVersionId?.name || 'Unknown';

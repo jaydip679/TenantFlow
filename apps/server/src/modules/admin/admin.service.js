@@ -17,12 +17,11 @@
 
 const { startOfMonth, endOfMonth, subMonths, differenceInDays } = require('date-fns');
 const mongoose         = require('mongoose');
-const Tenant           = require('../../models/Tenant.model');
+const identityFacade   = require('../../shared/facades/identity.facade');
 const Subscription     = require('../../models/Subscription.model');
 const Invoice          = require('../../models/Invoice.model');
 const DunningRecord    = require('../../models/DunningRecord.model');
 const SubscriptionEvent = require('../../models/SubscriptionEvent.model');
-const User             = require('../../models/User.model');
 const AuditLog         = require('../../models/AuditLog.model');
 const TenantChurnScore = require('../../models/TenantChurnScore.model');
 const { AppError }     = require('../../shared/errors/AppError');
@@ -415,10 +414,7 @@ const getTenantDetail = async (tenantId) => {
 
     const [readTenant, members, readInvoices, events, churnScore, readSub] = await Promise.all([
       ReadTenant.findOne({ tenantId }).lean(),
-      User.find({ tenantId, deletedAt: null })
-        .select('name email role status lastLoginAt createdAt')
-        .sort({ createdAt: 1 })
-        .lean(),
+      identityFacade.getTenantUsers(tenantId),
       ReadInvoice.find({ tenantId })
         .sort({ createdAt: -1 })
         .limit(5)

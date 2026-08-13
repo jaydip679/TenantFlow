@@ -28,9 +28,7 @@ const mongoose   = require('mongoose');
 const { addMonths, addYears } = require('date-fns');
 const Subscription      = require('../models/Subscription.model');
 const SubscriptionEvent = require('../models/SubscriptionEvent.model');
-const Tenant            = require('../models/Tenant.model');
-const Plan              = require('../models/Plan.model');
-const PlanVersion       = require('../models/PlanVersion.model');
+const identityFacade    = require('../shared/facades/identity.facade');
 const redisClient       = require('../config/redis');
 const logger            = require('../shared/utils/logger');
 const { addEventToOutbox } = require('../shared/events/outbox.helper');
@@ -81,18 +79,14 @@ const processExpiredSubscription = async (subscription) => {
           sub.status       = 'cancelled';
           sub.cancelledAt  = new Date();
           await sub.save({ session });
-
-          await Promise.all([
-            Tenant.findByIdAndUpdate(sub.tenantId, { status: 'cancelled' }, { session }),
-            SubscriptionEvent.create([{
-              tenantId:       sub.tenantId,
-              subscriptionId: sub._id,
-              event:          'subscription.cancelled',
-              fromStatus,
-              toStatus:       'cancelled',
-              triggeredBy:    { source: 'cron' },
-            }], { session }),
-          ]);
+          await SubscriptionEvent.create([{
+            tenantId:       sub.tenantId,
+            subscriptionId: sub._id,
+            event:          'subscription.cancelled',
+            fromStatus,
+            toStatus:       'cancelled',
+            triggeredBy:    { source: 'cron' },
+          }], { session });
 
           await addEventToOutbox({
             eventType: 'subscription.cancelled',
@@ -105,6 +99,7 @@ const processExpiredSubscription = async (subscription) => {
               subscriptionId: sub._id.toString(),
               cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
               cancellationReason: sub.cancelReason || null,
+              status: sub.status,
               aggregateVersion: sub.aggregateVersion
             },
             session
@@ -117,22 +112,9 @@ const processExpiredSubscription = async (subscription) => {
 
         // B. pending_downgrade — apply the downgrade
         if (sub.status === 'pending_downgrade' && sub.pendingPlanId) {
-          const newPlan = await Plan.findById(sub.pendingPlanId).session(session);
+          const newPlan = await identityFacade.getPlan(sub.pendingPlanId);
           if (newPlan && newPlan.isActive) {
-            const latestVersion = await PlanVersion.findOne({ planId: newPlan._id }).sort({ version: -1 }).session(session);
-            const newVersion = latestVersion?.version || 1;
-
-            const [newPV] = await PlanVersion.create([{
-              planId:      newPlan._id,
-              version:     newVersion + 1,
-              name:        newPlan.name,
-              displayName: newPlan.displayName,
-              price:       newPlan.price,
-              currency:    newPlan.currency,
-              interval:    newPlan.interval,
-              features:    newPlan.features,
-              snapshotAt:  new Date(),
-            }], { session });
+            const newPV = await identityFacade.createPlanVersionSnapshot(newPlan);
 
             const now = new Date();
             sub.planId        = newPlan._id;
@@ -143,19 +125,15 @@ const processExpiredSubscription = async (subscription) => {
             sub.currentPeriodStart = now;
             sub.currentPeriodEnd   = getPeriodEnd(now, newPlan.interval);
             await sub.save({ session });
-
-            await Promise.all([
-              Tenant.findByIdAndUpdate(sub.tenantId, { currentPlanId: newPlan._id }, { session }),
-              SubscriptionEvent.create([{
-                tenantId:       sub.tenantId,
-                subscriptionId: sub._id,
-                event:          'subscription.downgrade_applied',
-                fromStatus:     'pending_downgrade',
-                toStatus:       'active',
-                toPlanId:       newPlan._id,
-                triggeredBy:    { source: 'cron' },
-              }], { session }),
-            ]);
+            await SubscriptionEvent.create([{
+              tenantId:       sub.tenantId,
+              subscriptionId: sub._id,
+              event:          'subscription.downgrade_applied',
+              fromStatus:     'pending_downgrade',
+              toStatus:       'active',
+              toPlanId:       newPlan._id,
+              triggeredBy:    { source: 'cron' },
+            }], { session });
 
             await addEventToOutbox({
               eventType: 'subscription.renewed',
@@ -170,6 +148,8 @@ const processExpiredSubscription = async (subscription) => {
                 currentPeriodStart: sub.currentPeriodStart,
                 currentPeriodEnd: sub.currentPeriodEnd,
                 seatCount: sub.seatCount,
+                planId: newPlan._id.toString(),
+                features: newPlan.features,
                 planPrice: newPlan.price,
                 planInterval: newPlan.interval,
                 currency: newPlan.currency,
@@ -185,7 +165,7 @@ const processExpiredSubscription = async (subscription) => {
           const fromStatus = sub.status;
           const now = new Date();
 
-          const plan = await Plan.findById(sub.planId).session(session);
+          const plan = await identityFacade.getPlan(sub.planId);
           const interval = plan?.interval || 'monthly';
 
           sub.status             = 'active';
@@ -218,9 +198,11 @@ const processExpiredSubscription = async (subscription) => {
               currentPeriodStart: sub.currentPeriodStart,
               currentPeriodEnd: sub.currentPeriodEnd,
               seatCount: sub.seatCount,
-              planPrice: plan ? plan.price : 0,
+              planId: plan ? plan._id.toString() : null,
+              features: plan ? plan.features : null,
+              planPrice: plan?.price || 0,
               planInterval: interval,
-              currency: plan ? plan.currency : 'INR',
+              currency: plan?.currency || 'USD',
               aggregateVersion: sub.aggregateVersion
             },
             session

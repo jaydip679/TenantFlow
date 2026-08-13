@@ -163,8 +163,8 @@ const processPaymentJob = async (job) => {
 
       // Enqueue payment success email
       try {
-        const Tenant = require('../models/Tenant.model');
-        const billingTenant = await Tenant.findById(invoice.tenantId).select('name billingEmail').lean();
+        const identityFacade = require('../shared/facades/identity.facade');
+        const billingTenant = await identityFacade.getTenantBillingProfile(invoice.tenantId);
         if (billingTenant?.billingEmail) {
           await enqueueEmail({
             type:      'payment_success',
@@ -256,8 +256,8 @@ const processPaymentJob = async (job) => {
 
     // Enqueue payment failed email
     try {
-      const Tenant = require('../models/Tenant.model');
-      const failedTenant = await Tenant.findById(transaction.tenantId).select('name billingEmail').lean();
+      const identityFacade = require('../shared/facades/identity.facade');
+      const failedTenant = await identityFacade.getTenantBillingProfile(transaction.tenantId);
       if (failedTenant?.billingEmail) {
         await enqueueEmail({
           type:      'payment_failed',

@@ -25,12 +25,10 @@
 const { subMonths, differenceInDays } = require('date-fns');
 
 const TenantHealthScore = require('../../models/TenantHealthScore.model');
-const Tenant            = require('../../models/Tenant.model');
 const Subscription      = require('../../models/Subscription.model');
 const Invoice           = require('../../models/Invoice.model');
 const DunningRecord     = require('../../models/DunningRecord.model');
-const Plan              = require('../../models/Plan.model');
-const User              = require('../../models/User.model');
+const identityFacade    = require('../../shared/facades/identity.facade');
 
 const { AppError }     = require('../../shared/errors/AppError');
 const { ERROR_CODES }  = require('../../shared/errors/errorCodes');
@@ -98,10 +96,7 @@ const computeSignals = async (tenantId) => {
       : sub.planVersionId.features?.max_seats;
     maxSeats  = Number(maxSeats) || 0;
 
-    usedSeats = await User.countDocuments({
-      tenantId,
-      status: { $in: ['active', 'invited'] },
-    });
+    usedSeats = await identityFacade.getActiveUserCount(tenantId);
 
     if (maxSeats > 0) {
       const utilPct = usedSeats / maxSeats;
