@@ -86,9 +86,6 @@ const startServer = async () => {
   const { startPublisher } = require('./jobs/outbox.publisher');
   startPublisher();
 
-  const { startTenantConsumer } = require('./jobs/tenant.consumer');
-  await startTenantConsumer();
-
   // Phase 1D-C — Analytics Consumer
   if (process.env.ENABLE_MONOLITH_ANALYTICS_CONSUMER !== 'false') {
     const { startAnalyticsConsumer } = require('./modules/analytics/consumers/analytics.consumer');
@@ -158,9 +155,6 @@ const startServer = async () => {
       try {
         const { stopPublisher } = require('./jobs/outbox.publisher');
         await stopPublisher();
-        
-        const { stopTenantConsumer } = require('./jobs/tenant.consumer');
-        await stopTenantConsumer();
 
         const { stopAnalyticsConsumer } = require('./modules/analytics/consumers/analytics.consumer');
         await stopAnalyticsConsumer();

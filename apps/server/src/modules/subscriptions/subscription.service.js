@@ -117,17 +117,7 @@ const createSubscription = async (tenantId, planId, options = {}) => {
         }); // AuditLog service manages its own writes
       }
 
-      // Update Tenant.currentPlanId + features so tenantScope middleware
-      // can read the correct seatLimit from tenant.features.max_seats
-      const featuresMap = new Map(Object.entries({
-        max_seats:           plan.features.max_seats,
-        api_calls_per_month: plan.features.api_calls_per_month,
-        storage_gb:          plan.features.storage_gb,
-        advanced_analytics:  plan.features.advanced_analytics,
-        ai_assistant:        plan.features.ai_assistant,
-        priority_support:    plan.features.priority_support,
-      }));
-      await identityFacade.updateTenantFeatures(tenantId, plan._id, featuresMap, session);
+      // (Features map previously handled here is now managed via event consumer)
 
       // Add Outbox Event for Analytics (Phase 1D)
       await addEventToOutbox({
@@ -148,7 +138,7 @@ const createSubscription = async (tenantId, planId, options = {}) => {
           planPrice: plan.price,
           planInterval: plan.interval,
           currency: plan.currency,
-          maxSeats: plan.features.max_seats,
+          features: plan.features,
           aggregateVersion: subscription.aggregateVersion
         },
         session
@@ -628,8 +618,7 @@ const cancelSubscription = async (tenantId, { cancelAtPeriodEnd = true, reason }
 
       if (!cancelAtPeriodEnd) {
         subscription.status = 'cancelled';
-        // Immediate cancellation → update tenant status (outside transaction, since facade doesn't support session)
-        await identityFacade.updateTenantStatus(tenantId, 'cancelled');
+        // (Status will be propagated to Identity Service via outbox event)
       }
 
       await subscription.save({ session });
@@ -661,6 +650,7 @@ const cancelSubscription = async (tenantId, { cancelAtPeriodEnd = true, reason }
           subscriptionId: subscription._id.toString(),
           cancelAtPeriodEnd,
           cancellationReason: reason || null,
+          status: subscription.status,
           aggregateVersion: subscription.aggregateVersion
         },
         session
@@ -683,19 +673,24 @@ const cancelSubscription = async (tenantId, { cancelAtPeriodEnd = true, reason }
  * @param {Object} actorUser
  */
 const reactivateSubscription = async (tenantId, actorUser) => {
-  const subscription = await Subscription.findOne({ tenantId }).sort({ createdAt: -1 });
-  if (!subscription) throw new AppError('No subscription found.', 404, ERROR_CODES.SUBSCRIPTION_NOT_FOUND);
+  const session = await mongoose.startSession();
+  let subscription, fromStatus, newStatus;
 
-  validateTransition(subscription.status, 'active');
+  try {
+    await session.withTransaction(async () => {
+      subscription = await Subscription.findOne({ tenantId }).sort({ createdAt: -1 }).session(session);
+      if (!subscription) throw new AppError('No subscription found.', 404, ERROR_CODES.SUBSCRIPTION_NOT_FOUND);
 
-  const plan = await identityFacade.getPlan(subscription.planId);
-  if (!plan || !plan.isActive) throw new AppError('Plan is no longer available.', 422, ERROR_CODES.PLAN_ARCHIVED);
+      validateTransition(subscription.status, 'active');
 
-  const now         = new Date();
-  const newStatus   = plan.trialDays > 0 ? 'trialing' : 'active';
-  const trialEnd    = plan.trialDays > 0 ? addDays(now, plan.trialDays) : null;
-  const periodEnd   = trialEnd || getPeriodEnd(now, plan.interval);
-  const fromStatus  = subscription.status;
+      const plan = await identityFacade.getPlan(subscription.planId);
+      if (!plan || !plan.isActive) throw new AppError('Plan is no longer available.', 422, ERROR_CODES.PLAN_ARCHIVED);
+
+      const now         = new Date();
+      newStatus   = plan.trialDays > 0 ? 'trialing' : 'active';
+      const trialEnd    = plan.trialDays > 0 ? addDays(now, plan.trialDays) : null;
+      const periodEnd   = trialEnd || getPeriodEnd(now, plan.interval);
+      fromStatus  = subscription.status;
 
   subscription.status             = newStatus;
   subscription.currentPeriodStart = now;
@@ -706,11 +701,27 @@ const reactivateSubscription = async (tenantId, actorUser) => {
   subscription.cancelAtPeriodEnd  = false;
   subscription.cancelReason       = null;
   subscription.billingCycleAnchor = now;
+  await subscription.save({ session });
 
-  await subscription.save();
-
-  // Restore tenant status
-  await identityFacade.updateTenantStatus(tenantId, 'active');
+  // Add Outbox Event for Reactivation
+  await addEventToOutbox({
+    eventType: 'subscription.reactivated',
+    eventVersion: 'v1',
+    producer: 'billing-service',
+    aggregateType: 'subscription',
+    aggregateId: subscription._id.toString(),
+    tenantId: tenantId.toString(),
+    payload: {
+      subscriptionId: subscription._id.toString(),
+      status: subscription.status,
+      aggregateVersion: subscription.aggregateVersion,
+    },
+    session,
+  });
+    });
+  } finally {
+    session.endSession();
+  }
 
   await Promise.all([
     SubscriptionEvent.create({
