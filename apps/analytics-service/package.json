@@ -1,0 +1,29 @@
+{
+  "name": "tenantflow-analytics",
+  "version": "1.0.0",
+  "description": "TenantFlow Analytics Service",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test:unit": "jest --runInBand --forceExit --setupFiles dotenv/config"
+  },
+  "dependencies": {
+    "bullmq": "^5.0.0",
+    "cors": "^2.8.5",
+    "date-fns": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "ioredis": "^5.4.1",
+    "joi": "^18.2.3",
+    "mongoose": "^8.4.1",
+    "pino": "^9.1.0",
+    "uuid": "^9.0.1",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.2",
+    "pino-pretty": "^11.0.0"
+  }
+}
