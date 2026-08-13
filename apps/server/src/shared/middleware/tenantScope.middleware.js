@@ -27,8 +27,8 @@ const { ERROR_CODES } = require('../errors/errorCodes');
 const { asyncHandler } = require('../utils/asyncHandler');
 
 // Lazy requires to avoid circular deps at load time
-const getTenant       = () => require('../../models/Tenant.model');
-const getUser         = () => require('../../models/User.model');
+const identityFacade = require('../facades/identity.facade');
+const getSubscription = () => require('../../models/Subscription.model');
 
 const CACHE_TTL = 300; // 5 minutes
 
@@ -72,30 +72,30 @@ const tenantScope = (options = {}) =>
       req.tenantContext = JSON.parse(cached);
     } else {
       // 4. Cache miss — parallel DB queries
-      const Tenant       = getTenant();
-      const User         = getUser();
-
-      const [tenant, usedSeats] = await Promise.all([
-        Tenant.findById(tenantId).select('status currentPlanId features').lean(),
-        User.countDocuments({
-          tenantId,
-          status: { $in: ['active', 'invited'] },
-        }),
+      // Fetch from Identity Service over HTTP and Billing local DB in parallel
+      const [scopeContext, activeSub] = await Promise.all([
+        identityFacade.getTenantScopeContext(tenantId),
+        getSubscription().findOne({
+          tenantId: tenantId,
+          status: { $in: ['active', 'trialing', 'pending_downgrade', 'past_due'] },
+        }).lean(),
       ]);
 
-      if (!tenant) {
-        throw new AppError('Tenant not found.', 404, ERROR_CODES.NOT_FOUND);
+      if (!scopeContext) {
+        throw new AppError('Tenant not found', 404, ERROR_CODES.TENANT_NOT_FOUND);
       }
+
+      const { status, features, usedSeats } = scopeContext;
 
       // Convert Mongoose Map → plain object safely.
       // lean() may return a plain object (already iterable) or a Mongoose Map.
       // Array.from() handles both cases without crashing.
       let featuresObj = {};
-      if (tenant.features) {
+      if (features) {
         try {
-          featuresObj = tenant.features instanceof Map
-            ? Object.fromEntries(Array.from(tenant.features))
-            : Object.fromEntries(Object.entries(tenant.features));
+          featuresObj = features instanceof Map
+            ? Object.fromEntries(Array.from(features))
+            : Object.fromEntries(Object.entries(features));
         } catch {
           featuresObj = {};
         }

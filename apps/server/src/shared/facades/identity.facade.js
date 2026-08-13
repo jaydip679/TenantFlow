@@ -1,19 +1,19 @@
 'use strict';
 
 /**
- * Identity Facade
+ * Identity Facade (Phase 4C)
  * 
  * Provides an internal interface to Identity & Tenant domain data.
- * Used by Billing and other domains to fetch required context without
- * directly importing Identity Mongoose models.
- * 
- * Future: This will become a REST client or Redis projection lookup
- * when Identity is physically extracted.
+ * Used by Billing and other domains to fetch required context.
+ * Now acts as an HTTP client communicating with the Identity Service
+ * Internal APIs, entirely decoupling the MongoDB models.
  */
 
-const Plan = require('../../models/Plan.model');
-const PlanVersion = require('../../models/PlanVersion.model');
-const Tenant = require('../../models/Tenant.model');
+const internalClient = require('../utils/internalClient');
+const logger = require('../utils/logger');
+
+// Identity Service URL base
+const getBaseUrl = () => process.env.IDENTITY_SERVICE_URL || 'http://localhost:3003';
 
 /**
  * Fetch a Plan by ID.
@@ -21,7 +21,13 @@ const Tenant = require('../../models/Tenant.model');
  * @returns {Promise<Object>} Lean Plan document
  */
 const getPlan = async (planId) => {
-  return Plan.findById(planId).lean();
+  try {
+    const res = await internalClient.get(`${getBaseUrl()}/api/internal/identity/plans/${planId}`);
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) return null;
+    throw err;
+  }
 };
 
 /**
@@ -29,7 +35,13 @@ const getPlan = async (planId) => {
  * @returns {Promise<Object>} Lean Plan document
  */
 const getDefaultPlan = async () => {
-  return Plan.findOne({ isActive: true, isPublic: true }).sort({ price: 1 }).lean();
+  try {
+    const res = await internalClient.get(`${getBaseUrl()}/api/internal/identity/plans/default`);
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) return null;
+    throw err;
+  }
 };
 
 /**
@@ -38,7 +50,13 @@ const getDefaultPlan = async () => {
  * @returns {Promise<Object>} Lean PlanVersion document
  */
 const getPlanVersion = async (planVersionId) => {
-  return PlanVersion.findById(planVersionId).lean();
+  try {
+    const res = await internalClient.get(`${getBaseUrl()}/api/internal/identity/plan-versions/${planVersionId}`);
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) return null;
+    throw err;
+  }
 };
 
 /**
@@ -47,9 +65,13 @@ const getPlanVersion = async (planVersionId) => {
  * @returns {Promise<Object>} Lean Tenant document with billing fields
  */
 const getTenantBillingProfile = async (tenantId) => {
-  return Tenant.findById(tenantId)
-    .select('name slug status billingAddress taxId email billingEmail razorpayCustomerId')
-    .lean();
+  try {
+    const res = await internalClient.get(`${getBaseUrl()}/api/internal/identity/tenants/${tenantId}/billing-profile`);
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) return null;
+    throw err;
+  }
 };
 
 /**
@@ -58,38 +80,16 @@ const getTenantBillingProfile = async (tenantId) => {
  * @returns {Promise<Object>} Map of tenantId -> Tenant
  */
 const getTenantProfiles = async (tenantIds) => {
-  const tenants = await Tenant.find({ _id: { $in: tenantIds } })
-    .select('name slug status billingAddress taxId email billingEmail razorpayCustomerId')
-    .lean();
-    
-  return tenants.reduce((acc, t) => {
-    acc[t._id.toString()] = t;
-    return acc;
-  }, {});
+  if (!tenantIds?.length) return {};
+  try {
+    const res = await internalClient.post(`${getBaseUrl()}/api/internal/identity/tenants/profiles`, { tenantIds });
+    return res.data;
+  } catch (err) {
+    throw err;
+  }
 };
 
-/**
- * Update a tenant's current plan and features.
- * Used by Billing when a subscription is created or upgraded.
- * @param {string} tenantId 
- * @param {string} currentPlanId 
- * @param {Map|Object} features 
- * @param {Object} [session] - Optional MongoDB session
- */
-const updateTenantFeatures = async (tenantId, currentPlanId, features, session = null) => {
-  const options = session ? { session } : {};
-  return Tenant.findByIdAndUpdate(tenantId, { currentPlanId, features }, options);
-};
 
-/**
- * Update a tenant's status.
- * Used by Billing on cancellation/reactivation.
- * @param {string} tenantId 
- * @param {string} status 
- */
-const updateTenantStatus = async (tenantId, status) => {
-  return Tenant.findByIdAndUpdate(tenantId, { status });
-};
 
 /**
  * Get active/invited user count for a tenant to check seat limits.
@@ -97,41 +97,50 @@ const updateTenantStatus = async (tenantId, status) => {
  * @returns {Promise<number>}
  */
 const getActiveUserCount = async (tenantId) => {
-  const User = require('../../models/User.model');
-  return User.countDocuments({
-    tenantId,
-    status: { $in: ['active', 'invited'] },
-  });
+  try {
+    const res = await internalClient.get(`${getBaseUrl()}/api/internal/identity/tenants/${tenantId}/users/count`);
+    return res.data.count;
+  } catch (err) {
+    throw err;
+  }
+};
+
+/**
+ * Get users for a tenant.
+ */
+const getTenantUsers = async (tenantId) => {
+  try {
+    const res = await internalClient.get(`${getBaseUrl()}/api/internal/identity/tenants/${tenantId}/users`);
+    return res.data;
+  } catch (err) {
+    throw err;
+  }
+};
+
+/**
+ * Get tenant scope context (used by tenantScope.middleware.js)
+ */
+const getTenantScopeContext = async (tenantId) => {
+  try {
+    const res = await internalClient.get(`${getBaseUrl()}/api/internal/identity/tenants/${tenantId}/scope`);
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) return null;
+    throw err;
+  }
 };
 
 /**
  * Get the latest PlanVersion for a plan, or create one if none exists.
- * Returns the latest version document.
- * @param {string} planId 
- * @param {Object} plan 
+ * In Phase 4C, this is simplified.
  */
 const getLatestPlanVersion = async (planId, plan) => {
-  const existing = await PlanVersion.findOne({ planId }).sort({ version: -1 });
-  if (existing) return existing;
-
-  return PlanVersion.create({
-    planId,
-    version:     1,
-    name:        plan.name,
-    displayName: plan.displayName,
-    price:       plan.price,
-    currency:    plan.currency,
-    interval:    plan.interval,
-    features: new Map(Object.entries({
-      max_seats:           plan.features.max_seats,
-      api_calls_per_month: plan.features.api_calls_per_month,
-      storage_gb:          plan.features.storage_gb,
-      advanced_analytics:  plan.features.advanced_analytics,
-      ai_assistant:        plan.features.ai_assistant,
-      priority_support:    plan.features.priority_support,
-    })),
-    snapshotAt:  new Date(),
-  });
+  try {
+    const res = await internalClient.post(`${getBaseUrl()}/api/internal/identity/plans/${planId}/snapshot`);
+    return res.data;
+  } catch (err) {
+    throw err;
+  }
 };
 
 /**
@@ -140,29 +149,15 @@ const getLatestPlanVersion = async (planId, plan) => {
  * @param {Object} [session] 
  */
 const createPlanVersionSnapshot = async (plan, session = null) => {
-  const options = session ? { session } : {};
-  const latest = await PlanVersion.findOne({ planId: plan._id }).sort({ version: -1 }).session(session || null);
-  const nextVersion = (latest?.version || 0) + 1;
-
-  const newVersions = await PlanVersion.create([{
-    planId:      plan._id,
-    version:     nextVersion,
-    name:        plan.name,
-    displayName: plan.displayName,
-    price:       plan.price,
-    currency:    plan.currency,
-    interval:    plan.interval,
-    features: new Map(Object.entries({
-      max_seats:           plan.features.max_seats,
-      api_calls_per_month: plan.features.api_calls_per_month,
-      storage_gb:          plan.features.storage_gb,
-      advanced_analytics:  plan.features.advanced_analytics,
-      ai_assistant:        plan.features.ai_assistant,
-      priority_support:    plan.features.priority_support,
-    })),
-    snapshotAt:  new Date(),
-  }], options);
-  return newVersions[0];
+  if (session) {
+    logger.warn('MongoDB session passed to identityFacade.createPlanVersionSnapshot but cannot be used across HTTP boundary.');
+  }
+  try {
+    const res = await internalClient.post(`${getBaseUrl()}/api/internal/identity/plans/${plan._id}/snapshot`);
+    return res.data;
+  } catch (err) {
+    throw err;
+  }
 };
 
 module.exports = {
@@ -171,9 +166,9 @@ module.exports = {
   getPlanVersion,
   getTenantBillingProfile,
   getTenantProfiles,
-  updateTenantFeatures,
-  updateTenantStatus,
   getActiveUserCount,
+  getTenantUsers,
+  getTenantScopeContext,
   getLatestPlanVersion,
   createPlanVersionSnapshot,
 };

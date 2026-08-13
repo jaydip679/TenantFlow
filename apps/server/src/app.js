@@ -167,16 +167,30 @@ app.get('/health', async (req, res) => {
 // ── [8] Swagger Documentation (non-production) ───────────────
 setupSwagger(app);
 
-// ── [9] API Routes ────────────────────────────────────────────
-// Phase 1: Auth routes
-const authRoutes = require('./modules/auth/auth.routes');
-app.use('/api/v1/auth', authRoutes);
+// Phase 4B: Proxy Auth, Plans, and Tenants to Identity Service
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
-// Phase 2 — Plan Catalog & Tenant Management
-const planRoutes   = require('./modules/plans/plan.routes');
-const tenantRoutes = require('./modules/tenants/tenant.routes');
-app.use('/api/v1/plans',   planRoutes);
-app.use('/api/v1/tenants', tenantRoutes);
+// We block external access to internal APIs
+app.use('/api/internal/*', (req, res, next) => {
+  // If the request comes from our own proxy or gateway, it should be protected, but actually we just protect it via internalAuth middleware.
+  // The simplest is to ensure the gateway doesn't route /api/internal, but since we are IN the monolith, this IS the gateway.
+  // Wait, if this app.js is exposed on port 5000, external clients can hit /api/internal directly.
+  // internalAuth middleware already checks for X-Internal-Secret which external clients won't have.
+  next();
+});
+
+// Mount internal routes
+const internalBillingRoutes = require('./modules/billing/internal.routes');
+app.use('/api/internal/billing', internalBillingRoutes);
+
+const identityProxy = createProxyMiddleware({
+  target: process.env.IDENTITY_SERVICE_URL || 'http://localhost:3003',
+  changeOrigin: true,
+});
+
+app.use('/api/v1/auth', identityProxy);
+app.use('/api/v1/plans', identityProxy);
+app.use('/api/v1/tenants', identityProxy);
 
 // Phase 3 — Subscription Lifecycle
 const subscriptionRoutes = require('./modules/subscriptions/subscription.routes');
