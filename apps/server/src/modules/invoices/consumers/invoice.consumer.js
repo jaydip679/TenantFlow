@@ -3,8 +3,8 @@
 const mongoose = require('mongoose');
 const { RedisStreamsEventBus } = require('../../../shared/events/redisStreamsEventBus');
 const ProcessedEvent = require('../../../models/ProcessedEvent.model');
-const Invoice = require('../Invoice.model');
-const identityFacade = require('../../admin/identity.facade');
+const Invoice = require('../../../models/Invoice.model');
+const identityFacade = require('../../../shared/facades/identity.facade');
 const { enqueueEmail } = require('../../../queues/email.queue');
 const logger = require('../../../shared/utils/logger');
 
@@ -93,7 +93,15 @@ const startInvoiceConsumer = async () => {
     'pdf.generated': handlePdfGenerated,
   };
 
-  eventBus.consumeEvents(CONSUMER_GROUP, CONSUMER_NAME, router).catch(err => {
+  eventBus.subscribe({
+    groupName: CONSUMER_GROUP,
+    consumerName: CONSUMER_NAME,
+    eventTypes: Object.keys(router),
+    handler: async (envelope) => {
+      const route = router[envelope.eventType];
+      if (route) await route(envelope);
+    }
+  }).catch(err => {
     logger.error({ err: err.message }, 'Invoice consumer failed');
   });
 };

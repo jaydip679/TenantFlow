@@ -109,7 +109,15 @@ const startNotificationConsumer = async () => {
     'notification.created': handleNotificationCreated,
   };
 
-  eventBus.consumeEvents(CONSUMER_GROUP, CONSUMER_NAME, router).catch(err => {
+  eventBus.subscribe({
+    groupName: CONSUMER_GROUP,
+    consumerName: CONSUMER_NAME,
+    eventTypes: Object.keys(router),
+    handler: async (envelope) => {
+      const route = router[envelope.eventType];
+      if (route) await route(envelope);
+    }
+  }).catch(err => {
     logger.error({ err: err.message }, 'Notification consumer failed');
   });
 };
