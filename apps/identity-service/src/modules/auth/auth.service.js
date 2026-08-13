@@ -228,13 +228,25 @@ const register = async ({ email, password, firstName, lastName, companyName }) =
     session.endSession();
   }
 
-  // Create Trial Subscription (outside transaction to maintain bounded contexts)
+  // Create Trial Subscription via Internal Billing API (Phase 4B Decoupling)
   try {
-    const billingFacade = require('../../shared/facades/billing.facade');
-    await billingFacade.createTrialSubscription(tenantId);
+    const Plan = require('../../models/Plan.model');
+    const axios = require('axios');
+    
+    const defaultPlan = await Plan.findOne({ isActive: true, isPublic: true }).sort({ price: 1 }).lean();
+    if (defaultPlan) {
+      await axios.post(
+        `${process.env.BILLING_SERVICE_URL}/api/internal/billing/subscriptions/trial`,
+        { tenantId, planId: defaultPlan._id.toString() },
+        {
+          headers: { 'X-Internal-Secret': process.env.INTERNAL_SERVICE_SECRET },
+          timeout: 5000
+        }
+      );
+    }
   } catch (err) {
-    // Non-fatal for registration, but log it
-    logger.error({ err, tenantId }, 'Failed to create trial subscription during registration');
+    // Non-fatal for registration, but log it as a critical failure
+    logger.error({ err: err.message, tenantId }, 'TRIAL_SUBSCRIPTION_FAILED: Failed to create trial subscription during registration');
   }
 
   // Post-transaction: generate + store OTP (outside transaction — idempotent)

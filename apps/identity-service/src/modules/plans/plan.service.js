@@ -125,9 +125,18 @@ const archivePlan = async (planId, actor) => {
   if (!plan) throw new AppError('Plan not found.', 404, ERROR_CODES.NOT_FOUND);
   if (!plan.isActive) throw new AppError('Plan is already archived.', 409, ERROR_CODES.PLAN_ARCHIVED);
 
-  // Check for active subscriptions via Billing Facade
-  const billingFacade = require('../../shared/facades/billing.facade');
-  const activeSubCount = await billingFacade.getActiveSubscriptionCountByPlan(planId);
+  // Check for active subscriptions via Internal Billing API (Phase 4B Decoupling)
+  const axios = require('axios');
+  let activeSubCount = 0;
+  try {
+    const response = await axios.get(
+      `${process.env.BILLING_SERVICE_URL}/api/internal/billing/plans/${planId}/subscriptions/count`,
+      { headers: { 'X-Internal-Secret': process.env.INTERNAL_SERVICE_SECRET }, timeout: 5000 }
+    );
+    activeSubCount = response.data.count;
+  } catch (err) {
+    throw new AppError('Failed to verify active subscriptions. Please try again later.', 500, ERROR_CODES.INTERNAL_ERROR);
+  }
 
   if (activeSubCount > 0) {
     throw new AppError(
