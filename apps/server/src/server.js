@@ -90,8 +90,13 @@ const startServer = async () => {
   await startTenantConsumer();
 
   // Phase 1D-C — Analytics Consumer
-  const { startAnalyticsConsumer } = require('./modules/analytics/consumers/analytics.consumer');
-  await startAnalyticsConsumer();
+  if (process.env.ENABLE_MONOLITH_ANALYTICS_CONSUMER !== 'false') {
+    const { startAnalyticsConsumer } = require('./modules/analytics/consumers/analytics.consumer');
+    await startAnalyticsConsumer();
+    logger.info('Monolith Analytics Consumer started');
+  } else {
+    logger.info('Monolith Analytics Consumer disabled (running in analytics-service)');
+  }
 
   // ── Create HTTP server ──────────────────────────────
   // MUST be created before Socket.IO initialization (Phase 7)
@@ -112,16 +117,24 @@ const startServer = async () => {
   }
 
   // Phase 8 workers
-  require('./jobs/ai.worker');
-  logger.info('AI worker started');
+  if (process.env.ENABLE_MONOLITH_AI_WORKER !== 'false') {
+    require('./jobs/ai.worker');
+    logger.info('AI worker started');
+  } else {
+    logger.info('AI worker disabled (running in analytics-service)');
+  }
 
   // Phase 8 — Churn Analysis Cron (daily at 03:00 UTC)
   const { initChurnAnalysisCron } = require('./cron/churnAnalysis.cron');
   initChurnAnalysisCron();
 
   // Phase 10 — Revenue Forecast Worker
-  require('./jobs/forecast.worker');
-  logger.info('Forecast worker started');
+  if (process.env.ENABLE_MONOLITH_FORECAST_WORKER !== 'false') {
+    require('./jobs/forecast.worker');
+    logger.info('Forecast worker started');
+  } else {
+    logger.info('Forecast worker disabled (running in analytics-service)');
+  }
 
   // ── Start listening ───────────────────────────────
   server.listen(PORT, () => {

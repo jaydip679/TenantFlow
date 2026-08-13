@@ -44,9 +44,9 @@ forecastQueue.on('error', (err) => {
  * Uses a fixed jobId so duplicate triggers within the same minute are deduplicated.
  * @returns {Promise<import('bullmq').Job>}
  */
-const enqueueForecastJob = async () => {
+const enqueueForecastJob = async (data = {}) => {
   const jobId = `forecast:${new Date().toISOString().slice(0, 13)}`; // Deduplicate within same hour
-  return forecastQueue.add('compute-forecast', {}, { jobId });
+  return forecastQueue.add('compute-forecast', data, { jobId });
 };
 
 module.exports = { forecastQueue, enqueueForecastJob, QUEUE_NAME };

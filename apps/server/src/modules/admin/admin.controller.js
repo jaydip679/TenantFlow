@@ -128,7 +128,12 @@ const getForecast = asyncHandler(async (req, res) => {
  */
 const triggerForecast = asyncHandler(async (req, res) => {
   const { enqueueForecastJob } = require('../../queues/forecast.queue');
-  const job = await enqueueForecastJob();
+  
+  // Hydrate the payload for Analytics Service
+  const adminService = require('./admin.service');
+  const history = await adminService.getMrrMovements(6);
+  
+  const job = await enqueueForecastJob({ history });
   res.status(202).json({ success: true, data: { jobId: job.id, message: 'Forecast job enqueued.' } });
 });
 
