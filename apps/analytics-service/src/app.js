@@ -2,9 +2,10 @@
 
 const express = require('express');
 const cors = require('cors');
-const { errorHandler } = require('./shared/middleware/errorHandler');
-const proxyAuth = require('./shared/middleware/proxyAuth.middleware');
+const { globalErrorHandler } = require('./shared/errors/globalErrorHandler');
+const { proxyAuth } = require('./shared/middleware/proxyAuth.middleware');
 const adminRoutes = require('./modules/admin/admin.routes');
+const healthRoutes = require('./modules/health/health.routes');
 
 const app = express();
 
@@ -27,7 +28,10 @@ app.get('/health', (req, res) => {
 
 // Phase 3A: Endpoints will be migrated later.
 
+// Mount Health Routes
+app.use('/api/v1/health', healthRoutes);
+
 // Global Error Handler
-app.use(errorHandler);
+app.use(globalErrorHandler);
 
 module.exports = app;

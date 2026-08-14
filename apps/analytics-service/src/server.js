@@ -15,7 +15,7 @@ const connectDatabase = async () => {
     await mongoose.connect(uri);
     logger.info(`Connected to MongoDB Analytics DB: ${mongoose.connection.name}`);
   } catch (error) {
-    logger.fatal({ err: error.message }, 'Failed to connect to Analytics Database');
+    logger.error({ err: error.message }, 'Failed to connect to Analytics Database');
     process.exit(1);
   }
 };

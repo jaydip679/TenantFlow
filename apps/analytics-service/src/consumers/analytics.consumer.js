@@ -8,7 +8,7 @@ const logger = require('../shared/utils/logger');
 // Projections
 const { handleTenantCreated, handleTenantSuspended, handleTenantRestored, handleDunningStarted, handleDunningAbandoned } = require('../projections/tenant.projection');
 const { handleUserLogin, handlePaymentFailed } = require('../projections/engagement.projection');
-const { handleSubscriptionCreated, handleSubscriptionUpgraded, handleSubscriptionRenewed, handleSubscriptionCancelled } = require('../projections/subscription.projection');
+const { handleSubscriptionCreated, handleSubscriptionUpgraded, handleSubscriptionRenewed, handleSubscriptionCancelled, handleSubscriptionEventLogged } = require('../projections/subscription.projection');
 const { handleInvoiceCreated, handleInvoiceVoided, handleInvoicePaid } = require('../projections/invoice.projection');
 
 const eventBus = new RedisStreamsEventBus();
@@ -30,6 +30,7 @@ const projectionMap = {
   'invoice.voided': handleInvoiceVoided,
   'invoice.paid': handleInvoicePaid,
   'payment.failed': handlePaymentFailed,
+  'analytics.subscription_event.logged': handleSubscriptionEventLogged,
 };
 
 const handleAnalyticsEvent = async (envelope) => {
