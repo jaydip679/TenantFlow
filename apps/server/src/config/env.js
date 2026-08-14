@@ -39,12 +39,7 @@ const envSchema = Joi.object({
 
 
   // ── Email ───────────────────────────────────────────────
-  SMTP_HOST:   Joi.string().required(),
-  SMTP_PORT:   Joi.number().required(),
-  SMTP_USER:   Joi.string().required(),
-  SMTP_PASS:   Joi.string().required(),
-  EMAIL_FROM:  Joi.string().required(),
-
+          
   // ── Super Admin Seed ────────────────────────────────────
   SUPER_ADMIN_EMAIL:    Joi.string().email({ tlds: { allow: false } }).required(),
   SUPER_ADMIN_PASSWORD: Joi.string().min(8).required(),

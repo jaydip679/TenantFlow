@@ -238,6 +238,7 @@ app.use(
 // Phase 8 — AI Integration
 app.use(
   '/api/v1/ai',
+  authenticateNotification,
   createProxyMiddleware({
     target: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3002',
     changeOrigin: true,
@@ -272,6 +273,7 @@ app.use(
 // Route all other Admin and Health endpoints to Analytics Service
 app.use(
   ['/api/v1/admin', '/api/v1/health'],
+  authenticateNotification,
   createProxyMiddleware({
     target: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3002',
     changeOrigin: true,
