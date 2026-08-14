@@ -29,7 +29,7 @@ describe('Identity Tenant Consumer', () => {
 
   beforeAll(async () => {
     if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/tenantflow_test');
+      await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/tenantflow_test');
     }
   });
 
@@ -105,7 +105,7 @@ describe('Identity Tenant Consumer', () => {
   });
 
   it('2. Same event delivered concurrently -> only one consumer performs state transition', async () => {
-    const tenant = await createTestTenant('past_due');
+    const tenant = await createTestTenant('suspended');
     const envelope = generateEnvelope('invoice.paid', { invoiceId: 'inv-123', paymentId: 'pay-123' }, tenant._id.toString());
     const handler = mockHandlerMap['invoice.paid'];
 

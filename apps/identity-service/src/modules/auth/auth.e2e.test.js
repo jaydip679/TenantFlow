@@ -55,7 +55,7 @@ describe('E2E — Auth Flow', () => {
   beforeAll(async () => {
     // Ensure DB is connected (app.js connects lazily in some configurations)
     if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGODB_URI);
+      await mongoose.connect(process.env.MONGO_URI);
     }
     server = app.listen(0); // random port
   });

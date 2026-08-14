@@ -17,17 +17,15 @@
 
 jest.mock('../../models/Plan.model');
 jest.mock('../../models/PlanVersion.model');
-// Subscription model is a Phase 3 concern — stub it entirely via billingFacade
-jest.mock('../../shared/facades/billing.facade', () => ({
-  getActiveSubscriptionCountByPlan: jest.fn(),
-}));
+// Stub axios for billing requests
+jest.mock('axios', () => ({ get: jest.fn() }));
 jest.mock('../../shared/utils/auditLogService', () => ({
   createAuditLog: jest.fn().mockResolvedValue(undefined),
 }));
 
 const Plan         = require('../../models/Plan.model');
 const PlanVersion  = require('../../models/PlanVersion.model');
-const billingFacade = require('../../shared/facades/billing.facade');
+
 const planService  = require('./plan.service');
 const { ERROR_CODES } = require('../../shared/errors/errorCodes');
 
@@ -145,7 +143,8 @@ describe('planService.archivePlan()', () => {
   it('sets isActive=false and saves', async () => {
     const plan = makePlan();
     Plan.findById            = jest.fn().mockResolvedValue(plan);
-    billingFacade.getActiveSubscriptionCountByPlan = jest.fn().mockResolvedValue(0);
+    const axios = require('axios');
+    axios.get.mockResolvedValue({ data: { count: 0 } });
 
     await planService.archivePlan(plan._id, actor);
 
@@ -155,7 +154,8 @@ describe('planService.archivePlan()', () => {
 
   it('throws PLAN_HAS_ACTIVE_SUBSCRIPTIONS when active subscriptions exist', async () => {
     Plan.findById               = jest.fn().mockResolvedValue(makePlan());
-    billingFacade.getActiveSubscriptionCountByPlan = jest.fn().mockResolvedValue(3);
+    const axios = require('axios');
+    axios.get.mockResolvedValue({ data: { count: 3 } });
 
     await expect(planService.archivePlan('planId', actor))
       .rejects.toMatchObject({ errorCode: ERROR_CODES.PLAN_HAS_ACTIVE_SUBSCRIPTIONS });

@@ -27,9 +27,8 @@ const { ERROR_CODES } = require('../../shared/errors/errorCodes');
 jest.mock('../../models/User.model');
 jest.mock('../../models/Tenant.model');
 jest.mock('../../models/RefreshToken.model');
-jest.mock('../../shared/facades/billing.facade', () => ({
-  createTrialSubscription: jest.fn().mockResolvedValue({ _id: 'sub-123' }),
-}));
+jest.mock('../../models/Plan.model', () => ({ findOne: jest.fn().mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: 'plan-123' }) }) }) }));
+jest.mock('axios', () => ({ post: jest.fn().mockResolvedValue({}) }));
 jest.mock('../../config/redis', () => ({
   get:  jest.fn(),
   set:  jest.fn(),
