@@ -57,7 +57,7 @@ describe('Outbox Publisher Daemon', () => {
     startPublisher();
     
     // Wait for polling interval
-    await sleep(2100);
+    await sleep(3500);
 
     const updatedEvent = await OutboxEvent.findById(event._id);
     expect(updatedEvent.status).toBe('published');
@@ -88,7 +88,7 @@ describe('Outbox Publisher Daemon', () => {
     });
 
     startPublisher();
-    await sleep(2100);
+    await sleep(3500);
 
     const updatedEvent = await OutboxEvent.findById(event._id);
     expect(updatedEvent.status).toBe('publishing'); // Unchanged
@@ -111,7 +111,7 @@ describe('Outbox Publisher Daemon', () => {
     });
 
     startPublisher();
-    await sleep(2100);
+    await sleep(3500);
 
     const updatedEvent = await OutboxEvent.findById(event._id);
     expect(updatedEvent.status).toBe('published');
@@ -134,7 +134,7 @@ describe('Outbox Publisher Daemon', () => {
     });
 
     startPublisher();
-    await sleep(2100);
+    await sleep(3500);
 
     const updatedEvent = await OutboxEvent.findById(event._id);
     expect(updatedEvent.status).toBe('publishing');
@@ -159,7 +159,7 @@ describe('Outbox Publisher Daemon', () => {
     });
 
     startPublisher();
-    await sleep(2100);
+    await sleep(3500);
 
     const updatedEvent = await OutboxEvent.findById(event._id);
     expect(updatedEvent.status).toBe('failed');

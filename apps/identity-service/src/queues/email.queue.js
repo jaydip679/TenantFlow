@@ -59,7 +59,7 @@ emailQueue.on('error', (err) => {
  * @returns {Promise<import('bullmq').Job>}
  */
 const enqueueEmail = async (jobData) => {
-  const jobId = `email:${jobData.type}:${jobData.to}:${Date.now()}`;
+  const jobId = `email_${jobData.type}_${jobData.to}_${Date.now()}`;
   return emailQueue.add(jobData.type, jobData, { jobId });
 };
 
