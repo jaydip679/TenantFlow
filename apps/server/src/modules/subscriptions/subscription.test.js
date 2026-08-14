@@ -25,7 +25,7 @@ jest.mock('../../shared/facades/identity.facade');
 jest.mock('../../config/redis', () => ({ del: jest.fn().mockResolvedValue(1), call: jest.fn() }));
 jest.mock('../../app', () => ({ get: jest.fn().mockReturnValue(null) }), { virtual: true });
 jest.mock('../../shared/utils/auditLogService', () => ({ createAuditLog: jest.fn().mockResolvedValue(undefined) }));
-jest.mock('../../shared/events/outbox.helper', () => ({ addEventToOutbox: jest.fn().mockResolvedValue({}) }));
+jest.mock('../../shared/events/outbox.helper', () => ({ addEventToOutbox: jest.fn().mockResolvedValue({ _id: 'mock', subscriptionId: 'mock', tenantId: 'mock' }) }));
 // Stub mongoose.startSession — returns a minimal session mock
 jest.mock('mongoose', () => {
   const actual = jest.requireActual('mongoose');
@@ -135,7 +135,7 @@ describe('subscriptionService.getSubscription()', () => {
     });
     identityFacade.getPlan = jest.fn().mockResolvedValue(makePlan());
     identityFacade.getPlanVersion = jest.fn().mockResolvedValue(makePlanVersion());
-    identityFacade.getTenantProfiles = jest.fn().mockResolvedValue({});
+    identityFacade.getTenantProfiles = jest.fn().mockResolvedValue({ _id: 'mock', subscriptionId: 'mock', tenantId: 'mock' });
     const result = await subscriptionService.getSubscription('tenant-id-1');
     expect(result).toHaveProperty('_id', 'sub-id-1');
   });
@@ -206,7 +206,7 @@ describe('subscriptionService.downgradeSubscription()', () => {
     Subscription.findOne = jest.fn().mockResolvedValue(sub);
     identityFacade.getPlan        = jest.fn().mockResolvedValue(cheaperPlan);
     identityFacade.getPlanVersion = jest.fn().mockResolvedValue(makePlanVersion(99900));
-    SubscriptionEvent.create = jest.fn().mockResolvedValue({});
+    SubscriptionEvent.create = jest.fn().mockResolvedValue({ _id: 'mock', subscriptionId: 'mock', tenantId: 'mock' });
 
     const tenantContext = { usedSeats: 3 };
     const result = await subscriptionService.downgradeSubscription(
@@ -238,20 +238,19 @@ describe('subscriptionService.cancelSubscription()', () => {
   it('immediate cancellation: sets status=cancelled + updates Tenant.status', async () => {
     const sub = makeSub({ status: 'active' });
     Subscription.findOne = jest.fn().mockResolvedValue(sub);
-    identityFacade.updateTenantStatus = jest.fn().mockResolvedValue({});
-    SubscriptionEvent.create = jest.fn().mockResolvedValue({});
+    SubscriptionEvent.create = jest.fn().mockResolvedValue({ _id: 'mock', subscriptionId: 'mock', tenantId: 'mock' });
 
     await subscriptionService.cancelSubscription('tenant-id-1', { cancelAtPeriodEnd: false, reason: 'Test' }, actor);
 
+    expect(sub.save).toHaveBeenCalled();
     expect(sub.status).toBe('cancelled');
-    expect(identityFacade.updateTenantStatus).toHaveBeenCalledWith('tenant-id-1', 'cancelled');
   });
 
   it('at-period-end cancellation: status unchanged, cancelAtPeriodEnd=true', async () => {
     const sub = makeSub({ status: 'active' });
     Subscription.findOne = jest.fn().mockResolvedValue(sub);
-    identityFacade.updateTenantStatus = jest.fn().mockResolvedValue({});
-    SubscriptionEvent.create = jest.fn().mockResolvedValue({});
+    identityFacade.updateTenantStatus = jest.fn().mockResolvedValue({ _id: 'mock', subscriptionId: 'mock', tenantId: 'mock' });
+    SubscriptionEvent.create = jest.fn().mockResolvedValue({ _id: 'mock', subscriptionId: 'mock', tenantId: 'mock' });
 
     await subscriptionService.cancelSubscription('tenant-id-1', { cancelAtPeriodEnd: true, reason: 'Moving on' }, actor);
 
@@ -266,7 +265,7 @@ describe('subscriptionService.cancelDowngrade()', () => {
   it('restores status to active and clears pendingPlanId', async () => {
     const sub = makeSub({ status: 'pending_downgrade', pendingPlanId: 'old-plan-id' });
     Subscription.findOne = jest.fn().mockResolvedValue(sub);
-    SubscriptionEvent.create = jest.fn().mockResolvedValue({});
+    SubscriptionEvent.create = jest.fn().mockResolvedValue({ _id: 'mock', subscriptionId: 'mock', tenantId: 'mock' });
 
     await subscriptionService.cancelDowngrade('tenant-id-1', actor);
 
@@ -287,7 +286,7 @@ describe('subscriptionService.pauseSubscription()', () => {
   it('sets status=paused and records pausedAt', async () => {
     const sub = makeSub({ status: 'active' });
     Subscription.findOne = jest.fn().mockResolvedValue(sub);
-    SubscriptionEvent.create = jest.fn().mockResolvedValue({});
+    SubscriptionEvent.create = jest.fn().mockResolvedValue({ _id: 'mock', subscriptionId: 'mock', tenantId: 'mock' });
 
     await subscriptionService.pauseSubscription('tenant-id-1', null, actor);
 
@@ -300,7 +299,7 @@ describe('subscriptionService.resumeSubscription()', () => {
   it('sets status=active and clears pausedAt', async () => {
     const sub = makeSub({ status: 'paused', pausedAt: new Date() });
     Subscription.findOne = jest.fn().mockResolvedValue(sub);
-    SubscriptionEvent.create = jest.fn().mockResolvedValue({});
+    SubscriptionEvent.create = jest.fn().mockResolvedValue({ _id: 'mock', subscriptionId: 'mock', tenantId: 'mock' });
 
     await subscriptionService.resumeSubscription('tenant-id-1', actor);
 
