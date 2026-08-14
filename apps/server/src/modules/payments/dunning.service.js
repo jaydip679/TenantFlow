@@ -110,6 +110,8 @@ const initiateDunning = async (tenantId, subscriptionId, invoiceId, session = nu
         dunningRecordId: dunningRecord._id.toString(),
         invoiceId: invoiceId.toString(),
         subscriptionId: subscriptionId.toString(),
+        invoiceAmount: dunningRecord.invoiceAmount,
+        status: dunningRecord.status
       },
       session,
     });
@@ -388,6 +390,8 @@ const abandonDunning = async (dunningRecordId) => {
         payload: {
           dunningRecordId: dunningRecord._id.toString(),
           invoiceId: dunningRecord.invoiceId.toString(),
+          invoiceAmount: dunningRecord.invoiceAmount,
+          status: 'abandoned'
         },
         session,
       });

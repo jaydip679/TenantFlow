@@ -16,6 +16,8 @@ const readSubscriptionSchema = new mongoose.Schema(
     planInterval: { type: String },
     currency: { type: String, default: 'INR' },
     maxSeats: { type: Number },
+    subscriptionCreatedAt: { type: Date, default: null },
+    cancelledAt: { type: Date, default: null },
     aggregateVersion: { type: Number, required: true, default: 1 },
   },
   {

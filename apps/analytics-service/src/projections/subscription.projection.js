@@ -1,6 +1,7 @@
 'use strict';
 
 const ReadSubscription = require('../models/ReadSubscription.model');
+const ReadSubscriptionEvent = require('../models/ReadSubscriptionEvent.model');
 const logger = require('../shared/utils/logger');
 
 const handleSubscriptionCreated = async (envelope, session) => {
@@ -97,9 +98,37 @@ const handleSubscriptionCancelled = async (envelope, session) => {
   }
 };
 
+const handleSubscriptionEventLogged = async (envelope, session) => {
+  const { payload } = envelope;
+
+  try {
+    await ReadSubscriptionEvent.create([{
+      sourceEventId: payload.sourceEventId,
+      subscriptionId: payload.subscriptionId,
+      tenantId: payload.tenantId,
+      event: payload.event,
+      fromStatus: payload.fromStatus,
+      toStatus: payload.toStatus,
+      fromPlanId: payload.fromPlanId,
+      toPlanId: payload.toPlanId,
+      metadata: payload.metadata || {},
+      triggeredBy: payload.triggeredBy || {},
+      createdAt: payload.createdAt || new Date(),
+    }], { session });
+  } catch (err) {
+    // E11000 duplicate key error collection (code 11000)
+    if (err.code === 11000) {
+      logger.info({ sourceEventId: payload.sourceEventId }, 'Idempotent skip: ReadSubscriptionEvent already exists for sourceEventId');
+    } else {
+      throw err;
+    }
+  }
+};
+
 module.exports = {
   handleSubscriptionCreated,
   handleSubscriptionUpgraded,
   handleSubscriptionRenewed,
   handleSubscriptionCancelled,
+  handleSubscriptionEventLogged,
 };

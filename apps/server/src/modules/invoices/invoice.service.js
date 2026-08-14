@@ -181,7 +181,8 @@ const generateInvoice = async (subscriptionId, triggerReason, upgradeContext = n
             currency: 'INR',
             dueDate: invoice.dueDate,
             status: 'open',
-            aggregateVersion: invoice.aggregateVersion
+            aggregateVersion: invoice.aggregateVersion,
+            createdAt: invoice.createdAt
           },
           session
         });

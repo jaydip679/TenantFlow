@@ -23,7 +23,7 @@ const { addDays, addMonths, addYears, differenceInDays } = require('date-fns');
 const { addEventToOutbox } = require('../../shared/events/outbox.helper');
 
 const Subscription       = require('../../models/Subscription.model');
-const SubscriptionEvent  = require('../../models/SubscriptionEvent.model');
+const { logSubscriptionEvent } = require('../../shared/events/subscriptionEventLogger');
 const identityFacade     = require('../../shared/facades/identity.facade');
 const { AppError }       = require('../../shared/errors/AppError');
 const { ERROR_CODES }    = require('../../shared/errors/errorCodes');
@@ -92,7 +92,7 @@ const createSubscription = async (tenantId, planId, options = {}) => {
       }], { session });
 
       // Record creation event
-      await SubscriptionEvent.create([{
+      await logSubscriptionEvent([{
         tenantId,
         subscriptionId: subscription._id,
         event:          status === 'trialing' ? 'subscription.trial_started' : 'subscription.created',
@@ -139,7 +139,8 @@ const createSubscription = async (tenantId, planId, options = {}) => {
           planInterval: plan.interval,
           currency: plan.currency,
           features: plan.features,
-          aggregateVersion: subscription.aggregateVersion
+          aggregateVersion: subscription.aggregateVersion,
+          createdAt: subscription.createdAt
         },
         session
       });
@@ -371,7 +372,7 @@ const upgradeSubscription = async (tenantId, targetPlanId, actorUser, tenantCont
       await subscription.save({ session });
 
       // 11. Create SubscriptionEvent
-      await SubscriptionEvent.create([{
+      await logSubscriptionEvent([{
         tenantId,
         subscriptionId: subscription._id,
         event:          'subscription.upgraded',
@@ -509,7 +510,7 @@ const downgradeSubscription = async (tenantId, targetPlanId, reason, actorUser, 
   await subscription.save();
 
   await Promise.all([
-    SubscriptionEvent.create({
+    logSubscriptionEvent([{
       tenantId,
       subscriptionId: subscription._id,
       event:          'subscription.downgrade_scheduled',
@@ -518,7 +519,7 @@ const downgradeSubscription = async (tenantId, targetPlanId, reason, actorUser, 
       fromPlanId:     subscription.planId,
       toPlanId:       targetPlan._id,
       triggeredBy:    { userId: actorUser.id, role: actorUser.role, source: 'user' },
-    }),
+    }]),
     createAuditLog({
       event: 'subscription.downgrade_scheduled', resourceType: 'subscription',
       resourceId: subscription._id, tenantId, actor: actorUser,
@@ -564,14 +565,14 @@ const cancelDowngrade = async (tenantId, actorUser) => {
   await subscription.save();
 
   await Promise.all([
-    SubscriptionEvent.create({
+    logSubscriptionEvent([{
       tenantId,
       subscriptionId: subscription._id,
       event:          'subscription.downgrade_cancelled',
       fromStatus,
       toStatus:       'active',
       triggeredBy:    { userId: actorUser.id, role: actorUser.role, source: 'user' },
-    }),
+    }]),
     createAuditLog({
       event: 'subscription.downgrade_cancelled', resourceType: 'subscription',
       resourceId: subscription._id, tenantId, actor: actorUser,
@@ -623,12 +624,13 @@ const cancelSubscription = async (tenantId, { cancelAtPeriodEnd = true, reason }
 
       await subscription.save({ session });
 
-      await SubscriptionEvent.create([{
+      await logSubscriptionEvent([{
         tenantId,
         subscriptionId: subscription._id,
         event:          'subscription.cancelled',
         fromStatus,
         toStatus:       subscription.status,
+        fromPlanId:     subscription.planId,
         triggeredBy:    { userId: actorUser.id, role: actorUser.role, source: 'user' },
         metadata:       new Map([['cancelAtPeriodEnd', cancelAtPeriodEnd], ['reason', reason || '']]),
       }], { session });
@@ -651,7 +653,9 @@ const cancelSubscription = async (tenantId, { cancelAtPeriodEnd = true, reason }
           cancelAtPeriodEnd,
           cancellationReason: reason || null,
           status: subscription.status,
-          aggregateVersion: subscription.aggregateVersion
+          aggregateVersion: subscription.aggregateVersion,
+          createdAt: subscription.createdAt,
+          cancelledAt: subscription.cancelledAt
         },
         session
       });
@@ -724,14 +728,15 @@ const reactivateSubscription = async (tenantId, actorUser) => {
   }
 
   await Promise.all([
-    SubscriptionEvent.create({
+    logSubscriptionEvent([{
       tenantId,
       subscriptionId: subscription._id,
       event:          'subscription.reactivated',
       fromStatus,
       toStatus:       newStatus,
+      toPlanId:       subscription.planId,
       triggeredBy:    { userId: actorUser.id, role: actorUser.role, source: 'user' },
-    }),
+    }]),
     createAuditLog({
       event: 'subscription.reactivated', resourceType: 'subscription',
       resourceId: subscription._id, tenantId, actor: actorUser,
@@ -764,14 +769,15 @@ const pauseSubscription = async (tenantId, pauseEndsAt, actorUser) => {
   await subscription.save();
 
   await Promise.all([
-    SubscriptionEvent.create({
+    logSubscriptionEvent([{
       tenantId,
       subscriptionId: subscription._id,
       event:       'subscription.paused',
       fromStatus,
       toStatus:    'paused',
+      fromPlanId:  subscription.planId,
       triggeredBy: { userId: actorUser.id, role: actorUser.role, source: 'user' },
-    }),
+    }]),
     createAuditLog({
       event: 'subscription.paused', resourceType: 'subscription',
       resourceId: subscription._id, tenantId, actor: actorUser,
@@ -801,14 +807,15 @@ const resumeSubscription = async (tenantId, actorUser) => {
   await subscription.save();
 
   await Promise.all([
-    SubscriptionEvent.create({
+    logSubscriptionEvent([{
       tenantId,
       subscriptionId: subscription._id,
       event:       'subscription.resumed',
       fromStatus,
       toStatus:    'active',
+      toPlanId:    subscription.planId,
       triggeredBy: { userId: actorUser.id, role: actorUser.role, source: 'user' },
-    }),
+    }]),
     createAuditLog({
       event: 'subscription.resumed', resourceType: 'subscription',
       resourceId: subscription._id, tenantId, actor: actorUser,

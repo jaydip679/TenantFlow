@@ -27,7 +27,7 @@ const cron       = require('node-cron');
 const mongoose   = require('mongoose');
 const { addMonths, addYears } = require('date-fns');
 const Subscription      = require('../models/Subscription.model');
-const SubscriptionEvent = require('../models/SubscriptionEvent.model');
+const { logSubscriptionEvent } = require('../shared/events/subscriptionEventLogger');
 const identityFacade    = require('../shared/facades/identity.facade');
 const redisClient       = require('../config/redis');
 const logger            = require('../shared/utils/logger');
@@ -79,12 +79,13 @@ const processExpiredSubscription = async (subscription) => {
           sub.status       = 'cancelled';
           sub.cancelledAt  = new Date();
           await sub.save({ session });
-          await SubscriptionEvent.create([{
+          await logSubscriptionEvent([{
             tenantId:       sub.tenantId,
             subscriptionId: sub._id,
             event:          'subscription.cancelled',
             fromStatus,
             toStatus:       'cancelled',
+            fromPlanId:     sub.planId,
             triggeredBy:    { source: 'cron' },
           }], { session });
 
@@ -100,7 +101,9 @@ const processExpiredSubscription = async (subscription) => {
               cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
               cancellationReason: sub.cancelReason || null,
               status: sub.status,
-              aggregateVersion: sub.aggregateVersion
+              aggregateVersion: sub.aggregateVersion,
+              createdAt: sub.createdAt,
+              cancelledAt: sub.cancelledAt
             },
             session
           });
@@ -117,6 +120,7 @@ const processExpiredSubscription = async (subscription) => {
             const newPV = await identityFacade.createPlanVersionSnapshot(newPlan);
 
             const now = new Date();
+            const oldPlanId = sub.planId;
             sub.planId        = newPlan._id;
             sub.planVersionId = newPV._id;
             sub.status        = 'active';
@@ -125,12 +129,13 @@ const processExpiredSubscription = async (subscription) => {
             sub.currentPeriodStart = now;
             sub.currentPeriodEnd   = getPeriodEnd(now, newPlan.interval);
             await sub.save({ session });
-            await SubscriptionEvent.create([{
+            await logSubscriptionEvent([{
               tenantId:       sub.tenantId,
               subscriptionId: sub._id,
               event:          'subscription.downgrade_applied',
               fromStatus:     'pending_downgrade',
               toStatus:       'active',
+              fromPlanId:     oldPlanId,
               toPlanId:       newPlan._id,
               triggeredBy:    { source: 'cron' },
             }], { session });
@@ -153,7 +158,8 @@ const processExpiredSubscription = async (subscription) => {
                 planPrice: newPlan.price,
                 planInterval: newPlan.interval,
                 currency: newPlan.currency,
-                aggregateVersion: sub.aggregateVersion
+                aggregateVersion: sub.aggregateVersion,
+                createdAt: sub.createdAt
               },
               session
             });
@@ -175,12 +181,14 @@ const processExpiredSubscription = async (subscription) => {
           await sub.save({ session });
 
           if (fromStatus === 'trialing') {
-            await SubscriptionEvent.create([{
+            await logSubscriptionEvent([{
               tenantId:       sub.tenantId,
               subscriptionId: sub._id,
               event:          'subscription.converted_to_paid',
               fromStatus,
               toStatus:       'active',
+              fromPlanId:     sub.planId,
+              toPlanId:       sub.planId,
               triggeredBy:    { source: 'cron' },
             }], { session });
           }
@@ -203,7 +211,8 @@ const processExpiredSubscription = async (subscription) => {
               planPrice: plan?.price || 0,
               planInterval: interval,
               currency: plan?.currency || 'USD',
-              aggregateVersion: sub.aggregateVersion
+              aggregateVersion: sub.aggregateVersion,
+              createdAt: sub.createdAt
             },
             session
           });

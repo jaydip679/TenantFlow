@@ -14,6 +14,7 @@ const readInvoiceSchema = new mongoose.Schema(
     amountPaid: { type: Number, default: 0 },
     dueDate: { type: Date, required: true },
     paidAt: { type: Date, default: null },
+    invoiceCreatedAt: { type: Date, default: null },
     aggregateVersion: { type: Number, required: true, default: 1 },
   },
   {
