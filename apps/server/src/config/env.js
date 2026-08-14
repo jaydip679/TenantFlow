@@ -37,18 +37,6 @@ const envSchema = Joi.object({
   CLOUDINARY_API_KEY:    Joi.string().required(),
   CLOUDINARY_API_SECRET: Joi.string().required(),
 
-  // ── AI ──────────────────────────────────────────────────
-  AI_PROVIDER:   Joi.string().valid('openai', 'gemini').required(),
-  OPENAI_API_KEY: Joi.string().when('AI_PROVIDER', {
-    is: 'openai',
-    then: Joi.required(),
-    otherwise: Joi.optional(),
-  }),
-  GEMINI_API_KEY: Joi.string().when('AI_PROVIDER', {
-    is: 'gemini',
-    then: Joi.required(),
-    otherwise: Joi.optional(),
-  }),
 
   // ── Email ───────────────────────────────────────────────
   SMTP_HOST:   Joi.string().required(),

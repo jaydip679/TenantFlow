@@ -42,23 +42,12 @@ const startServer = async () => {
 
   // ── Start BullMQ Workers ────────────────────────────────────────
   // Workers must start after DB + Redis are healthy
-  if (process.env.ENABLE_MONOLITH_EMAIL_WORKER !== 'false') {
-    require('./jobs/email.worker');
-    logger.info('Email worker started');
-  } else {
-    logger.info('Email worker disabled (running in platform-service)');
-  }
 
   // Phase 4 workers
   require('./jobs/invoice.worker');
   logger.info('Invoice worker started');
 
-  if (process.env.ENABLE_MONOLITH_PDF_WORKER !== 'false') {
-    require('./jobs/pdf.worker');
-    logger.info('PDF worker started');
-  } else {
-    logger.info('PDF worker disabled (running in platform-service)');
-  }
+
 
   const { startInvoiceConsumer } = require('./modules/invoices/consumers/invoice.consumer');
   await startInvoiceConsumer();
@@ -86,14 +75,6 @@ const startServer = async () => {
   const { startPublisher } = require('./jobs/outbox.publisher');
   startPublisher();
 
-  // Phase 1D-C — Analytics Consumer
-  if (process.env.ENABLE_MONOLITH_ANALYTICS_CONSUMER !== 'false') {
-    const { startAnalyticsConsumer } = require('./modules/analytics/consumers/analytics.consumer');
-    await startAnalyticsConsumer();
-    logger.info('Monolith Analytics Consumer started');
-  } else {
-    logger.info('Monolith Analytics Consumer disabled (running in analytics-service)');
-  }
 
   // ── Create HTTP server ──────────────────────────────
   // MUST be created before Socket.IO initialization (Phase 7)
@@ -105,33 +86,8 @@ const startServer = async () => {
   app.set('io', io);  // Make io accessible in workers via app.get('io')
   logger.info('Socket.IO initialized');
 
-  // Phase 7 workers
-  if (process.env.ENABLE_MONOLITH_NOTIFICATION_WORKER !== 'false') {
-    require('./jobs/notification.worker');
-    logger.info('Notification worker started');
-  } else {
-    logger.info('Notification worker disabled (running in platform-service)');
-  }
 
-  // Phase 8 workers
-  if (process.env.ENABLE_MONOLITH_AI_WORKER !== 'false') {
-    require('./jobs/ai.worker');
-    logger.info('AI worker started');
-  } else {
-    logger.info('AI worker disabled (running in analytics-service)');
-  }
 
-  // Phase 8 — Churn Analysis Cron (daily at 03:00 UTC)
-  const { initChurnAnalysisCron } = require('./cron/churnAnalysis.cron');
-  initChurnAnalysisCron();
-
-  // Phase 10 — Revenue Forecast Worker
-  if (process.env.ENABLE_MONOLITH_FORECAST_WORKER !== 'false') {
-    require('./jobs/forecast.worker');
-    logger.info('Forecast worker started');
-  } else {
-    logger.info('Forecast worker disabled (running in analytics-service)');
-  }
 
   // ── Start listening ───────────────────────────────
   server.listen(PORT, () => {
@@ -156,8 +112,6 @@ const startServer = async () => {
         const { stopPublisher } = require('./jobs/outbox.publisher');
         await stopPublisher();
 
-        const { stopAnalyticsConsumer } = require('./modules/analytics/consumers/analytics.consumer');
-        await stopAnalyticsConsumer();
 
         const { stopInvoiceConsumer } = require('./modules/invoices/consumers/invoice.consumer');
         await stopInvoiceConsumer();

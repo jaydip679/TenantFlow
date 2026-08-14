@@ -208,115 +208,84 @@ app.use('/api/v1/payments', paymentRoutes);
 const dunningRoutes = require('./modules/payments/dunning.routes');
 app.use('/api/v1/admin/dunning', dunningRoutes);
 
-// Phase 7 — Notifications
-if (process.env.ENABLE_MONOLITH_NOTIFICATION_WORKER !== 'false') {
-  const notificationRoutes = require('./modules/notifications/notification.routes');
-  app.use('/api/v1/notifications', notificationRoutes);
-} else {
-  // Proxy to Platform Service
-  const { createProxyMiddleware } = require('http-proxy-middleware');
-  const { authenticate } = require('./shared/middleware/authenticate.middleware');
-  
-  // We apply authenticate first to populate req.user, then proxy and pass headers
-  app.use(
-    '/api/v1/notifications',
-    authenticate,
-    createProxyMiddleware({
-      target: process.env.PLATFORM_SERVICE_URL || 'http://localhost:3001',
-      changeOrigin: true,
-      on: {
-        proxyReq: (proxyReq, req, res) => {
-          if (req.user) {
-            proxyReq.setHeader('x-user-id', req.user.id);
-            if (req.user.tenantId) {
-              proxyReq.setHeader('x-tenant-id', req.user.tenantId.toString());
-            }
-            if (req.user.role) {
-              proxyReq.setHeader('x-user-role', req.user.role);
-            }
+// Phase 7 — Notifications (Proxy to Platform Service)
+const { createProxyMiddleware: createNotificationProxy } = require('http-proxy-middleware');
+const { authenticate: authenticateNotification } = require('./shared/middleware/authenticate.middleware');
+
+// We apply authenticate first to populate req.user, then proxy and pass headers
+app.use(
+  '/api/v1/notifications',
+  authenticateNotification,
+  createNotificationProxy({
+    target: process.env.PLATFORM_SERVICE_URL || 'http://localhost:3001',
+    changeOrigin: true,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        if (req.user) {
+          proxyReq.setHeader('x-user-id', req.user.id);
+          if (req.user.tenantId) {
+            proxyReq.setHeader('x-tenant-id', req.user.tenantId.toString());
+          }
+          if (req.user.role) {
+            proxyReq.setHeader('x-user-role', req.user.role);
           }
         }
       }
-    })
-  );
-}
+    }
+  })
+);
 
 // Phase 8 — AI Integration
-if (process.env.ENABLE_MONOLITH_AI_API !== 'false') {
-  const aiRoutes = require('./modules/ai/ai.routes');
-  app.use('/api/v1/ai', aiRoutes);
-} else {
-  const { createProxyMiddleware } = require('http-proxy-middleware');
-  const { authenticate } = require('./shared/middleware/authenticate.middleware');
-  
-  const aiProxyFilter = (pathname, req) => {
-    if (req.method === 'POST' && pathname.match(/^\/api\/v1\/ai\/churn\/trigger\/[^\/]+$/)) {
-      return false; // Stays in Monolith
-    }
-    return pathname.startsWith('/api/v1/ai');
-  };
-
-  app.use(
-    authenticate,
-    createProxyMiddleware(aiProxyFilter, {
-      target: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3002',
-      changeOrigin: true,
-      on: {
-        proxyReq: (proxyReq, req, res) => {
-          if (req.user) {
-            proxyReq.setHeader('x-user-id', req.user.id);
-            if (req.user.tenantId) proxyReq.setHeader('x-tenant-id', req.user.tenantId.toString());
-            if (req.user.role) proxyReq.setHeader('x-user-role', req.user.role);
-          }
+app.use(
+  '/api/v1/ai',
+  createProxyMiddleware({
+    target: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3002',
+    changeOrigin: true,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        if (req.user) {
+          proxyReq.setHeader('x-user-id', req.user.id);
+          if (req.user.tenantId) proxyReq.setHeader('x-tenant-id', req.user.tenantId.toString());
+          if (req.user.role) proxyReq.setHeader('x-user-role', req.user.role);
         }
       }
-    })
-  );
-
-  const aiRoutes = require('./modules/ai/ai.routes');
-  app.use('/api/v1/ai', aiRoutes);
-}
+    }
+  })
+);
 
 // Phase 9 & 10 — Admin Dashboard & Analytics & Health
-if (process.env.ENABLE_MONOLITH_ADMIN_API !== 'false') {
-  const adminRoutes = require('./modules/admin/admin.routes');
-  const healthRoutes = require('./modules/health/health.routes');
-  app.use('/api/v1/admin', adminRoutes);
-  app.use('/api/v1/admin', healthRoutes);
-} else {
-  // Proxy foundation for Admin API
-  const { createProxyMiddleware } = require('http-proxy-middleware');
-  const { authenticate } = require('./shared/middleware/authenticate.middleware');
-  
-  // Custom filter: Do NOT proxy PATCH /api/v1/admin/tenants/:tenantId/status
-  // as this command mutates Identity DB and stays in Monolith.
-  const adminProxyFilter = (pathname, req) => {
-    if (req.method === 'PATCH' && pathname.match(/^\/api\/v1\/admin\/tenants\/[^\/]+\/status$/)) {
-      return false;
+// Route PATCH status changes to Identity Service
+app.use(
+  '/api/v1/admin/tenants',
+  (req, res, next) => {
+    if (req.method === 'PATCH' && req.path.match(/^\/[^\/]+\/status$/)) {
+      createProxyMiddleware({
+        target: process.env.IDENTITY_SERVICE_URL || 'http://localhost:3003',
+        changeOrigin: true,
+      })(req, res, next);
+    } else {
+      next();
     }
-    return pathname.startsWith('/api/v1/admin');
-  };
+  }
+);
 
-  app.use(
-    createProxyMiddleware(adminProxyFilter, {
-      target: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3002',
-      changeOrigin: true,
-      on: {
-        proxyReq: (proxyReq, req, res) => {
-          if (req.user) {
-            proxyReq.setHeader('x-user-id', req.user.id);
-            if (req.user.tenantId) proxyReq.setHeader('x-tenant-id', req.user.tenantId.toString());
-            if (req.user.role) proxyReq.setHeader('x-user-role', req.user.role);
-          }
+// Route all other Admin and Health endpoints to Analytics Service
+app.use(
+  ['/api/v1/admin', '/api/v1/health'],
+  createProxyMiddleware({
+    target: process.env.ANALYTICS_SERVICE_URL || 'http://localhost:3002',
+    changeOrigin: true,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        if (req.user) {
+          proxyReq.setHeader('x-user-id', req.user.id);
+          if (req.user.tenantId) proxyReq.setHeader('x-tenant-id', req.user.tenantId.toString());
+          if (req.user.role) proxyReq.setHeader('x-user-role', req.user.role);
         }
       }
-    })
-  );
-
-  // Still mount the local adminRoutes so the PATCH command can be handled by Monolith
-  const adminRoutes = require('./modules/admin/admin.routes');
-  app.use('/api/v1/admin', adminRoutes);
-}
+    }
+  })
+);
 
 // Phase 9 — Bull Board (queue monitor UI)
 // Mounted at /admin/queues (separate from /api/v1 to avoid JWT middleware)
@@ -332,8 +301,6 @@ if (process.env.ENABLE_MONOLITH_ADMIN_API !== 'false') {
     const { pdfQueue }          = require('./queues/pdf.queue');
     const { paymentQueue }      = require('./queues/payment.queue');
     const { dunningQueue }      = require('./queues/dunning.queue');
-    const { notificationQueue } = require('./queues/notification.queue');
-    const { aiQueue }           = require('./queues/ai.queue');
 
     const serverAdapter = new ExpressAdapter();
     serverAdapter.setBasePath('/admin/queues');
@@ -345,8 +312,6 @@ if (process.env.ENABLE_MONOLITH_ADMIN_API !== 'false') {
         new BullMQAdapter(pdfQueue),
         new BullMQAdapter(paymentQueue),
         new BullMQAdapter(dunningQueue),
-        new BullMQAdapter(notificationQueue),
-        new BullMQAdapter(aiQueue),
       ],
       serverAdapter,
     });

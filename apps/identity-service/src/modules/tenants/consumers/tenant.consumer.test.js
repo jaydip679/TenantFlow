@@ -1,15 +1,15 @@
 'use strict';
 
 const mongoose = require('mongoose');
-const Tenant = require('../models/Tenant.model');
-const ProcessedEvent = require('../models/ProcessedEvent.model');
-const OutboxEvent = require('../models/OutboxEvent.model');
+const Tenant = require('../../../models/Tenant.model');
+const ProcessedEvent = require('../../../models/ProcessedEvent.model');
+const OutboxEvent = require('../../../models/OutboxEvent.model');
 const { startTenantConsumer, stopTenantConsumer } = require('./tenant.consumer');
-const { RedisStreamsEventBus } = require('../shared/events/redisStreamsEventBus');
+const { RedisStreamsEventBus } = require('../../../shared/events/redisStreamsEventBus');
 
 let mockHandlerMap = {};
 
-jest.mock('../shared/events/redisStreamsEventBus', () => {
+jest.mock('../../../shared/events/redisStreamsEventBus', () => {
   return {
     RedisStreamsEventBus: jest.fn().mockImplementation(() => ({
       subscribe: jest.fn().mockImplementation(async ({ eventTypes, handler }) => {
