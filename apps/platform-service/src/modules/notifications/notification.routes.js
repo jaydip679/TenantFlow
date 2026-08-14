@@ -111,7 +111,7 @@ router.get(
 router.post(
   '/read-all',
   proxyAuth,
-  notificationController.markAllAsRead
+  notificationController.markAllRead
 );
 
 /**
@@ -149,6 +149,6 @@ router.patch(
  *       404:
  *         description: Not found or not owned by user
  */
-router.delete('/:notificationId', authenticate, validate(notificationIdSchema), notificationController.deleteNotification);
+router.delete('/:notificationId', proxyAuth, validate(notificationIdSchema), notificationController.deleteNotification);
 
 module.exports = router;

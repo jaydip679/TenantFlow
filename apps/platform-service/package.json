@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test:unit": "jest --runInBand --forceExit --setupFiles dotenv/config"
+    "test:unit": "jest --runInBand --forceExit --setupFiles dotenv/config",
+    "test": "jest --runInBand --forceExit --setupFiles dotenv/config"
   },
   "dependencies": {
     "bullmq": "^4.10.0",
