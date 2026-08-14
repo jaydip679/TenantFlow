@@ -45,6 +45,7 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/auth', require('./modules/auth/auth.routes'));
 app.use('/api/v1/plans', require('./modules/plans/plan.routes'));
 app.use('/api/v1/tenants', require('./modules/tenants/tenant.routes'));
+app.use('/api/v1/admin', require('./modules/admin/admin.routes'));
 
 // Internal API Routes
 app.use('/api/internal/identity', require('./modules/internal/internal.routes'));
