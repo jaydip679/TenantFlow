@@ -125,10 +125,20 @@ const handleSubscriptionEventLogged = async (envelope, session) => {
   }
 };
 
+const handleSubscriptionReactivated = async (envelope, session) => {
+  const { payload } = envelope;
+  const sub = await SubscriptionProjection.findOne({ subscriptionId: payload.subscriptionId }).session(session);
+  if (sub && sub.status !== 'active') {
+    sub.status = 'active';
+    await sub.save({ session });
+  }
+};
+
 module.exports = {
   handleSubscriptionCreated,
   handleSubscriptionUpgraded,
   handleSubscriptionRenewed,
+  handleSubscriptionReactivated,
   handleSubscriptionCancelled,
   handleSubscriptionEventLogged,
 };
