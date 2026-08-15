@@ -6,26 +6,15 @@ import {
   Calendar,
   DollarSign,
   AlertTriangle,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  Send,
   Bot,
   TrendingUp,
   Zap,
+  Send,
 } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout.jsx';
 import LoadingSpinner from '../../components/common/LoadingSpinner.jsx';
 import { fetchSubscription, fetchTenantInvoices } from '../../store/subscriptionSlice.js';
 import { aiChatBaseURL } from '../../services/subscriptionService.js';
-
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const ACCENT  = '#6c63ff';
-const ACCENT2 = '#a78bfa';
-const BG_CARD = 'rgba(255,255,255,0.04)';
-const BORDER  = 'rgba(255,255,255,0.08)';
-const TEXT    = '#f0f0ff';
-const MUTED   = '#8b8bad';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function daysUntil(dateStr) {
@@ -46,41 +35,23 @@ function formatCurrency(amount, currency = 'INR') {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function MetricCard({ icon: Icon, label, value, sub, accentColor = ACCENT, badge }) {
+function MetricCard({ icon: Icon, label, value, sub, accentClass = 'text-primary', bgClass = 'bg-primary/10', borderClass = 'border-primary/20', badge }) {
   return (
-    <div style={{
-      background: BG_CARD,
-      border: `1px solid ${BORDER}`,
-      borderRadius: 16,
-      padding: '22px 24px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 12,
-      backdropFilter: 'blur(8px)',
-      transition: 'border-color 0.2s',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 12,
-          background: `${accentColor}22`,
-          border: `1px solid ${accentColor}44`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Icon size={20} color={accentColor} />
+    <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col gap-3 shadow-sm transition-colors hover:border-primary/30">
+      <div className="flex items-start justify-between">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${bgClass} ${borderClass} border`}>
+          <Icon size={20} className={accentClass} />
         </div>
         {badge && (
-          <span style={{
-            padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-            background: badge.bg, color: badge.color, border: `1px solid ${badge.border || 'transparent'}`,
-          }}>
+          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${badge.className}`}>
             {badge.text}
           </span>
         )}
       </div>
       <div>
-        <p style={{ margin: 0, fontSize: 13, color: MUTED, fontWeight: 500 }}>{label}</p>
-        <p style={{ margin: '4px 0 0', fontSize: 24, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>{value}</p>
-        {sub && <p style={{ margin: '4px 0 0', fontSize: 12, color: MUTED }}>{sub}</p>}
+        <p className="m-0 text-[13px] text-text-muted font-medium">{label}</p>
+        <p className="m-0 mt-1 text-2xl font-bold text-text-primary leading-tight">{value}</p>
+        {sub && <p className="m-0 mt-1 text-xs text-text-muted">{sub}</p>}
       </div>
     </div>
   );
@@ -88,18 +59,15 @@ function MetricCard({ icon: Icon, label, value, sub, accentColor = ACCENT, badge
 
 function StatusBadge({ status }) {
   const map = {
-    paid:          { bg: 'rgba(34,197,94,0.15)',  color: '#4ade80', text: 'Paid' },
-    open:          { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa', text: 'Open' },
-    void:          { bg: 'rgba(107,114,128,0.2)', color: '#9ca3af', text: 'Void' },
-    uncollectible: { bg: 'rgba(239,68,68,0.15)',  color: '#f87171', text: 'Uncollectible' },
-    draft:         { bg: 'rgba(234,179,8,0.15)',  color: '#facc15', text: 'Draft' },
+    paid:          { className: 'bg-success/15 text-success border-success/30', text: 'Paid' },
+    open:          { className: 'bg-accent/15 text-accent border-accent/30', text: 'Open' },
+    void:          { className: 'bg-text-muted/20 text-text-muted border-transparent', text: 'Void' },
+    uncollectible: { className: 'bg-danger/15 text-danger border-danger/30', text: 'Uncollectible' },
+    draft:         { className: 'bg-warning/15 text-warning border-warning/30', text: 'Draft' },
   };
-  const cfg = map[status] ?? { bg: 'rgba(255,255,255,0.1)', color: '#9ca3af', text: status };
+  const cfg = map[status] ?? { className: 'bg-surface-secondary text-text-muted border-transparent', text: status };
   return (
-    <span style={{
-      padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-      background: cfg.bg, color: cfg.color,
-    }}>
+    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${cfg.className}`}>
       {cfg.text}
     </span>
   );
@@ -107,23 +75,22 @@ function StatusBadge({ status }) {
 
 function SeatProgressBar({ used, total }) {
   const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
-  const dangerColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : ACCENT;
+  const dangerColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : 'var(--primary)';
+  
   return (
-    <div style={{ marginTop: 4 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-        <span style={{ fontSize: 13, color: MUTED }}>Seat utilisation</span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: dangerColor }}>{used} / {total} ({pct}%)</span>
+    <div className="mt-1">
+      <div className="flex justify-between mb-1.5">
+        <span className="text-[13px] text-text-muted">Seat utilisation</span>
+        <span className="text-[13px] font-semibold" style={{ color: dangerColor }}>{used} / {total} ({pct}%)</span>
       </div>
-      <div style={{
-        height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
-      }}>
-        <div style={{
-          height: '100%',
-          width: `${pct}%`,
-          borderRadius: 999,
-          background: `linear-gradient(90deg, ${dangerColor}, ${dangerColor}cc)`,
-          transition: 'width 0.6s ease',
-        }} />
+      <div className="h-2 rounded-full bg-surface-secondary overflow-hidden">
+        <div 
+          className="h-full rounded-full transition-all duration-500 ease-out"
+          style={{
+            width: `${pct}%`,
+            background: `linear-gradient(90deg, ${dangerColor}, ${dangerColor}cc)`
+          }}
+        />
       </div>
     </div>
   );
@@ -230,66 +197,35 @@ function AIChatPanel({ accessToken }) {
   };
 
   return (
-    <div style={{
-      background: BG_CARD,
-      border: `1px solid ${BORDER}`,
-      borderRadius: 16,
-      display: 'flex',
-      flexDirection: 'column',
-      height: 440,
-      overflow: 'hidden',
-    }}>
+    <div className="bg-surface border border-border rounded-2xl flex flex-col h-[440px] overflow-hidden shadow-sm">
       {/* Header */}
-      <div style={{
-        padding: '14px 18px',
-        borderBottom: `1px solid ${BORDER}`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-      }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: 10,
-          background: `${ACCENT}22`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <Bot size={16} color={ACCENT2} />
+      <div className="px-4.5 py-3.5 border-b border-border flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center">
+          <Bot size={16} className="text-primary" />
         </div>
         <div>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: TEXT }}>AI Assistant</p>
-          <p style={{ margin: 0, fontSize: 11, color: MUTED }}>Powered by TenantFlow AI</p>
+          <p className="m-0 text-sm font-semibold text-text-primary">AI Assistant</p>
+          <p className="m-0 text-[11px] text-text-muted">Powered by TenantFlow AI</p>
         </div>
         {streaming && (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: '#4ade80',
-              animation: 'tf-pulse 1.2s ease-in-out infinite',
-            }} />
-            <span style={{ fontSize: 11, color: '#4ade80' }}>Streaming…</span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            <span className="text-[11px] text-success">Streaming…</span>
           </div>
         )}
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
         {messages.map((msg, i) => (
-          <div key={i} style={{
-            display: 'flex',
-            justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-          }}>
-            <div style={{
-              maxWidth: '80%',
-              padding: '10px 14px',
-              borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-              background: msg.role === 'user' ? `${ACCENT}33` : 'rgba(255,255,255,0.06)',
-              border: `1px solid ${msg.role === 'user' ? `${ACCENT}44` : BORDER}`,
-              fontSize: 13,
-              color: TEXT,
-              lineHeight: 1.5,
-              whiteSpace: 'pre-wrap',
-            }}>
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap ${
+              msg.role === 'user' 
+                ? 'rounded-[16px_16px_4px_16px] bg-primary/10 border border-primary/20 text-text-primary' 
+                : 'rounded-[16px_16px_16px_4px] bg-surface-secondary border border-border text-text-primary'
+            }`}>
               {msg.content || (streaming && i === messages.length - 1 ? (
-                <span style={{ color: MUTED }}>▋</span>
+                <span className="text-text-muted">▋</span>
               ) : '')}
             </div>
           </div>
@@ -298,13 +234,7 @@ function AIChatPanel({ accessToken }) {
       </div>
 
       {/* Input */}
-      <div style={{
-        padding: '12px 16px',
-        borderTop: `1px solid ${BORDER}`,
-        display: 'flex',
-        gap: 8,
-        alignItems: 'flex-end',
-      }}>
+      <div className="p-3 border-t border-border flex gap-2 items-end bg-surface">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -312,34 +242,16 @@ function AIChatPanel({ accessToken }) {
           placeholder="Ask about your subscription, invoices…"
           rows={1}
           disabled={streaming}
-          style={{
-            flex: 1,
-            resize: 'none',
-            background: 'rgba(255,255,255,0.06)',
-            border: `1px solid ${BORDER}`,
-            borderRadius: 10,
-            padding: '10px 14px',
-            color: TEXT,
-            fontSize: 13,
-            outline: 'none',
-            fontFamily: 'inherit',
-            lineHeight: 1.5,
-          }}
+          className="flex-1 resize-none bg-surface-secondary border border-border rounded-xl px-3.5 py-2.5 text-text-primary text-[13px] outline-none font-sans leading-relaxed focus:border-primary transition-colors disabled:opacity-70"
         />
         <button
           onClick={sendMessage}
           disabled={!input.trim() || streaming}
-          style={{
-            width: 38, height: 38,
-            borderRadius: 10,
-            border: 'none',
-            background: (!input.trim() || streaming) ? 'rgba(108,99,255,0.2)' : ACCENT,
-            color: '#fff',
-            cursor: (!input.trim() || streaming) ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.15s',
-            flexShrink: 0,
-          }}
+          className={`w-9 h-9 rounded-xl border-none flex items-center justify-center shrink-0 transition-colors ${
+            (!input.trim() || streaming) 
+              ? 'bg-primary/20 text-white cursor-not-allowed' 
+              : 'bg-primary hover:bg-primary-hover text-white cursor-pointer'
+          }`}
         >
           <Send size={15} />
         </button>
@@ -380,7 +292,7 @@ export default function DashboardPage() {
   if (pageLoading) {
     return (
       <DashboardLayout>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+        <div className="flex items-center justify-center min-h-[400px]">
           <LoadingSpinner size={56} />
         </div>
       </DashboardLayout>
@@ -389,11 +301,11 @@ export default function DashboardPage() {
 
   const statusBadge = () => {
     switch (subscription?.status) {
-      case 'active':   return { bg: 'rgba(34,197,94,0.15)',  color: '#4ade80', text: 'Active',   border: 'rgba(34,197,94,0.3)' };
-      case 'trialing': return { bg: 'rgba(234,179,8,0.15)', color: '#facc15', text: 'Trialing', border: 'rgba(234,179,8,0.3)' };
-      case 'past_due': return { bg: 'rgba(239,68,68,0.15)', color: '#f87171', text: 'Past Due', border: 'rgba(239,68,68,0.3)' };
-      case 'canceled': return { bg: 'rgba(107,114,128,0.2)',color: '#9ca3af', text: 'Canceled', border: 'transparent' };
-      default:         return { bg: 'rgba(255,255,255,0.08)', color: MUTED,  text: subscription?.status ?? '—', border: 'transparent' };
+      case 'active':   return { className: 'bg-success/15 text-success border-success/30', text: 'Active' };
+      case 'trialing': return { className: 'bg-warning/15 text-warning border-warning/30', text: 'Trialing' };
+      case 'past_due': return { className: 'bg-danger/15 text-danger border-danger/30', text: 'Past Due' };
+      case 'canceled': return { className: 'bg-text-muted/20 text-text-muted border-transparent', text: 'Canceled' };
+      default:         return { className: 'bg-surface-secondary text-text-muted border-transparent', text: subscription?.status ?? '—' };
     }
   };
 
@@ -401,20 +313,11 @@ export default function DashboardPage() {
     <DashboardLayout>
       {/* Trial banner */}
       {isTrialing && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '14px 20px',
-          marginBottom: 24,
-          borderRadius: 12,
-          background: 'rgba(234,179,8,0.12)',
-          border: '1px solid rgba(234,179,8,0.3)',
-        }}>
-          <AlertTriangle size={18} color="#facc15" />
-          <span style={{ fontSize: 14, color: '#fde68a', fontWeight: 500 }}>
+        <div className="flex items-center gap-3 px-5 py-3.5 mb-6 rounded-xl bg-warning/10 border border-warning/30">
+          <AlertTriangle size={18} className="text-warning" />
+          <span className="text-sm text-warning font-medium">
             Your free trial expires in <strong>{daysLeft} day{daysLeft !== 1 ? 's' : ''}</strong>.{' '}
-            <a href="/dashboard/subscription" style={{ color: '#facc15', textDecoration: 'underline' }}>
+            <a href="/dashboard/subscription" className="text-warning underline hover:text-amber-600 transition-colors">
               Upgrade now
             </a>{' '}
             to keep uninterrupted access.
@@ -423,28 +326,23 @@ export default function DashboardPage() {
       )}
 
       {/* Page header */}
-      <div style={{ marginBottom: 28 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: TEXT }}>
+      <div className="mb-7">
+        <h2 className="m-0 text-[22px] font-bold text-text-primary tracking-tight">
           Welcome back{user?.name ? `, ${user.name}` : ''}
         </h2>
-        <p style={{ margin: '4px 0 0', fontSize: 14, color: MUTED }}>
+        <p className="m-0 mt-1 text-sm text-text-muted">
           Here's an overview of your account.
         </p>
       </div>
 
       {/* Metric cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: 16,
-        marginBottom: 28,
-      }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
         <MetricCard
           icon={Zap}
           label="Subscription Status"
           value={(subscription?.planVersionId?.displayName || subscription?.planId?.displayName) ?? '—'}
           sub={`Billed ${subscription?.planVersionId?.interval || subscription?.planId?.interval || 'monthly'}`}
-          accentColor={ACCENT}
+          accentClass="text-primary" bgClass="bg-primary/10" borderClass="border-primary/20"
           badge={statusBadge()}
         />
         <MetricCard
@@ -452,24 +350,23 @@ export default function DashboardPage() {
           label="Seats Used"
           value={`${usedSeats} / ${totalSeats || '∞'}`}
           sub={totalSeats ? `${Math.round((usedSeats / totalSeats) * 100)}% utilised` : 'Unlimited seats'}
-          accentColor="#a78bfa"
+          accentClass="text-accent" bgClass="bg-accent/10" borderClass="border-accent/20"
         />
         <MetricCard
           icon={Calendar}
           label="Next Billing Date"
           value={formatDate(nextBilling)}
           sub={nextBilling ? `In ${daysUntil(nextBilling)} days` : undefined}
-          accentColor="#34d399"
+          accentClass="text-emerald-500" bgClass="bg-emerald-500/10" borderClass="border-emerald-500/20"
         />
         <MetricCard
           icon={DollarSign}
           label="Last Invoice"
           value={lastInvoice ? formatCurrency(lastInvoice.amount, lastInvoice.currency) : '—'}
           sub={lastInvoice ? formatDate(lastInvoice.createdAt) : 'No invoices yet'}
-          accentColor="#fb923c"
+          accentClass="text-orange-500" bgClass="bg-orange-500/10" borderClass="border-orange-500/20"
           badge={lastInvoice ? {
-            bg: lastInvoice.status === 'paid' ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)',
-            color: lastInvoice.status === 'paid' ? '#4ade80' : '#60a5fa',
+            className: lastInvoice.status === 'paid' ? 'bg-success/15 text-success border-success/30' : 'bg-accent/15 text-accent border-accent/30',
             text: lastInvoice.status,
           } : undefined}
         />
@@ -477,19 +374,16 @@ export default function DashboardPage() {
 
       {/* Seat utilisation bar */}
       {totalSeats > 0 && (
-        <div style={{
-          background: BG_CARD, border: `1px solid ${BORDER}`,
-          borderRadius: 16, padding: '20px 24px', marginBottom: 28,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <TrendingUp size={16} color={ACCENT2} />
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: TEXT }}>Team Seat Usage</h3>
+        <div className="bg-surface border border-border rounded-2xl px-6 py-5 mb-7 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={16} className="text-primary" />
+            <h3 className="m-0 text-[15px] font-semibold text-text-primary">Team Seat Usage</h3>
           </div>
           <SeatProgressBar used={usedSeats} total={totalSeats} />
           {totalSeats > 0 && usedSeats >= totalSeats && (
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: '#f87171' }}>
+            <p className="m-0 mt-2 text-xs text-danger font-medium">
               You've reached your seat limit.{' '}
-              <a href="/dashboard/subscription" style={{ color: '#f87171', textDecoration: 'underline' }}>
+              <a href="/dashboard/subscription" className="text-danger underline hover:text-red-600 transition-colors">
                 Upgrade your plan
               </a>{' '}
               to add more members.
@@ -499,53 +393,37 @@ export default function DashboardPage() {
       )}
 
       {/* Two-column: Recent invoices + AI chat */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: hasAI ? '1fr 400px' : '1fr',
-        gap: 20,
-        alignItems: 'start',
-      }}>
+      <div className={`grid gap-5 items-start ${hasAI ? 'lg:grid-cols-[1fr_400px]' : 'grid-cols-1'}`}>
         {/* Recent invoices */}
-        <div style={{
-          background: BG_CARD, border: `1px solid ${BORDER}`,
-          borderRadius: 16, overflow: 'hidden',
-        }}>
-          <div style={{
-            padding: '18px 24px',
-            borderBottom: `1px solid ${BORDER}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <CreditCard size={16} color={ACCENT2} />
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: TEXT }}>Recent Invoices</h3>
+        <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm">
+          <div className="px-6 py-4.5 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CreditCard size={16} className="text-primary" />
+              <h3 className="m-0 text-[15px] font-semibold text-text-primary">Recent Invoices</h3>
             </div>
-            <a href="/dashboard/invoices" style={{ fontSize: 13, color: ACCENT2, textDecoration: 'none' }}>
-              View all →
+            <a href="/dashboard/invoices" className="text-[13px] text-primary hover:text-primary-hover font-medium no-underline transition-colors">
+              View all &rarr;
             </a>
           </div>
 
           {invoicesLoading ? (
-            <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+            <div className="p-10 flex justify-center">
               <LoadingSpinner size={36} />
             </div>
           ) : !invoices || invoices.length === 0 ? (
-            <div style={{ padding: '40px 24px', textAlign: 'center', color: MUTED }}>
-              <CreditCard size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
-              <p style={{ margin: 0 }}>No invoices yet</p>
+            <div className="py-10 px-6 text-center text-text-muted">
+              <CreditCard size={32} className="mx-auto mb-3 opacity-40" />
+              <p className="m-0 text-sm">No invoices yet</p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                  <tr className="border-b border-border bg-surface-secondary/50">
                     {['Invoice #', 'Date', 'Amount', 'Status'].map((h) => (
-                      <th key={h} style={{
-                        padding: '12px 20px', textAlign: 'left',
-                        fontSize: 11, fontWeight: 600, color: MUTED,
-                        textTransform: 'uppercase', letterSpacing: '0.05em',
-                      }}>{h}</th>
+                      <th key={h} className="px-5 py-3 text-left text-[11px] font-semibold text-text-muted uppercase tracking-[0.05em]">
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -553,20 +431,18 @@ export default function DashboardPage() {
                   {(Array.isArray(invoices) ? invoices : []).slice(0, 5).map((inv, i) => (
                     <tr
                       key={inv._id ?? inv.id ?? i}
-                      style={{ borderBottom: `1px solid ${BORDER}`, transition: 'background 0.15s' }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      className="border-b border-border transition-colors hover:bg-surface-secondary/30 last:border-0"
                     >
-                      <td style={{ padding: '14px 20px', fontSize: 13, color: TEXT, fontWeight: 500 }}>
+                      <td className="px-5 py-3.5 text-[13px] text-text-primary font-medium whitespace-nowrap">
                         {inv.invoiceNumber ?? inv.number ?? `#${String(i + 1).padStart(4, '0')}`}
                       </td>
-                      <td style={{ padding: '14px 20px', fontSize: 13, color: MUTED }}>
+                      <td className="px-5 py-3.5 text-[13px] text-text-muted whitespace-nowrap">
                         {formatDate(inv.createdAt ?? inv.date)}
                       </td>
-                      <td style={{ padding: '14px 20px', fontSize: 13, color: TEXT, fontWeight: 600 }}>
+                      <td className="px-5 py-3.5 text-[13px] text-text-primary font-semibold whitespace-nowrap">
                         {formatCurrency(inv.amount ?? inv.total, inv.currency)}
                       </td>
-                      <td style={{ padding: '14px 20px' }}>
+                      <td className="px-5 py-3.5 whitespace-nowrap">
                         <StatusBadge status={inv.status} />
                       </td>
                     </tr>

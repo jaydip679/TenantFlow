@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { CreditCard, Zap, Check, X, AlertTriangle } from 'lucide-react';
+import { CreditCard, Zap, Check, X, AlertTriangle, Loader2 } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout.jsx';
 import { getSubscription, getPlans, cancelSubscription, reactivateSubscription, subscribePlan, upgradePlan, downgradePlan } from '../../services/subscriptionService.js';
 import api from '../../services/api.js';
@@ -71,7 +71,7 @@ export default function SubscriptionPage() {
           await downgradePlan(tenantId, { targetPlanId: modal.plan._id });
         }
       }
-      showToast('Plan changed successfully!');
+      showToast('✅ Plan changed successfully!');
       setModal(null);
       const res = await getSubscription(tenantId);
       const rawSub = res.data.data;
@@ -116,33 +116,35 @@ export default function SubscriptionPage() {
     }
   };
 
-  if (loading) return <DashboardLayout><div style={{ padding: 80, textAlign: 'center' }}><div className="btn-spinner" style={{ width: 36, height: 36, borderWidth: 3, margin: '0 auto', borderTopColor: 'var(--color-primary)' }} /></div></DashboardLayout>;
+  if (loading) return <DashboardLayout><div className="p-20 text-center"><Loader2 size={36} className="text-primary animate-spin mx-auto" /></div></DashboardLayout>;
 
   // sub.planId is the populated Plan object — compare its _id against plan cards
   const currentPlanId = sub?.planId?._id?.toString() || sub?.planId?.toString();
 
   return (
-    <DashboardLayout>
-      <div style={{ maxWidth: 1100 }}>
-        <div className="page-header">
+    <DashboardLayout title="Subscription">
+      <div className="max-w-[1100px] font-sans text-text-primary">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-7">
           <div>
-            <h1 className="page-title">
-              <CreditCard size={22} style={{ display: 'inline', marginRight: 10, verticalAlign: 'middle' }} />
+            <h1 className="m-0 text-[26px] font-bold text-text-primary flex items-center gap-2.5 tracking-tight">
+              <div className="w-9 h-9 rounded-[10px] bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                <CreditCard size={18} className="text-primary" />
+              </div>
               Subscription
             </h1>
-            <p className="page-subtitle">Manage your plan, upgrade or downgrade anytime</p>
+            <p className="m-0 mt-1.5 text-sm text-text-muted">Manage your plan, upgrade or downgrade anytime</p>
           </div>
         </div>
 
-        {error && <div className="alert alert-danger">{error}</div>}
-        {toast && <div className="alert alert-success">{toast}</div>}
+        {error && <div className="mb-6 p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm font-medium">{error}</div>}
+        {toast && <div className="mb-6 p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm font-medium">{toast}</div>}
 
         {/* No subscription yet */}
         {!sub && !error && !loading && (
-          <div className="card" style={{ marginBottom: 28, textAlign: 'center', padding: '40px 28px' }}>
-            <CreditCard size={40} style={{ color: 'var(--color-primary)', marginBottom: 12, opacity: 0.6 }} />
-            <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>No Active Plan</h2>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 14, margin: 0 }}>
+          <div className="bg-surface border border-border rounded-2xl p-10 text-center mb-7 shadow-sm">
+            <CreditCard size={40} className="text-primary/60 mb-3 mx-auto" />
+            <h2 className="m-0 mb-2 text-lg font-bold text-text-primary">No Active Plan</h2>
+            <p className="m-0 text-sm text-text-muted">
               You don't have a subscription yet. Choose a plan below to get started.
             </p>
           </div>
@@ -150,60 +152,59 @@ export default function SubscriptionPage() {
 
         {/* Current Plan */}
         {sub && (
-          <div className="card" style={{ marginBottom: 28 }}>
-            <div className="card-header">
+          <div className="bg-surface border border-border rounded-2xl p-6 mb-7 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-5 border-b border-border">
               <div>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>
+                <h2 className="m-0 text-lg font-bold text-text-primary">
                   {sub.planVersionId?.displayName || sub.planId?.displayName || 'Current Plan'}
-                  {' '}<span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontWeight: 400 }}>({sub.planVersionId?.interval || sub.planId?.interval || 'monthly'})</span>
+                  {' '}<span className="text-[13px] text-text-muted font-normal">({sub.planVersionId?.interval || sub.planId?.interval || 'monthly'})</span>
                 </h2>
-                <p style={{ color: 'var(--color-text-muted)', fontSize: 13, marginTop: 4 }}>
-                   Next billing: <strong>{formatDate(sub.currentPeriodEnd)}</strong>
-                   {' · '}Amount: <strong>{formatCurrency(sub.planVersionId?.price || sub.planId?.price)}</strong>
+                <p className="m-0 mt-1 text-[13px] text-text-muted">
+                   Next billing: <strong className="text-text-primary">{formatDate(sub.currentPeriodEnd)}</strong>
+                   {' · '}Amount: <strong className="text-text-primary">{formatCurrency(sub.planVersionId?.price || sub.planId?.price)}</strong>
                 </p>
               </div>
               {/* Smart cancel / status area */}
               {sub.status === 'cancelled' ? (
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#f87171', marginBottom: 8 }}>
+                <div className="text-right">
+                  <span className="block text-xs font-bold text-danger mb-2">
                     ✕ Subscription Cancelled
                   </span>
                   <button
-                    className="btn-primary btn-sm"
+                    className="px-4 py-2 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
                     onClick={confirmReactivate}
                     disabled={actionLoading}
                   >
-                    {actionLoading ? <span className="btn-spinner" /> : '↺ Reactivate Plan'}
+                    {actionLoading ? <Loader2 size={15} className="animate-spin" /> : '↺ Reactivate Plan'}
                   </button>
                 </div>
               ) : sub.cancelAtPeriodEnd ? (
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 12, color: '#fbbf24', margin: '0 0 8px', fontWeight: 600 }}>
+                <div className="text-right">
+                  <p className="m-0 mb-2 text-xs font-bold text-warning">
                     ⚠ Cancels on {formatDate(sub.currentPeriodEnd)}
                   </p>
-                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 10px' }}>
+                  <p className="m-0 mb-2.5 text-[11px] text-text-muted">
                     Access continues until that date.
                   </p>
                   <button
-                    className="btn-secondary btn-sm"
+                    className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
                     onClick={confirmReactivate}
                     disabled={actionLoading}
-                    style={{ fontSize: 12 }}
                   >
-                    {actionLoading ? <span className="btn-spinner" /> : '↺ Keep Plan'}
+                    {actionLoading ? <Loader2 size={15} className="animate-spin" /> : '↺ Keep Plan'}
                   </button>
                 </div>
               ) : sub.status === 'pending_downgrade' ? (
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 12, color: '#a78bfa', margin: '0 0 4px', fontWeight: 600 }}>
+                <div className="text-right">
+                  <p className="m-0 mb-1 text-xs font-bold text-primary">
                     ↓ Downgrade scheduled for {formatDate(sub.currentPeriodEnd)}
                   </p>
-                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0 }}>
+                  <p className="m-0 text-[11px] text-text-muted">
                     Current plan remains active until then.
                   </p>
                 </div>
               ) : (
-                <button className="btn-danger btn-sm" onClick={() => setModal('cancel')}>
+                <button className="px-4 py-2 rounded-lg border-none bg-danger hover:bg-red-600 text-white cursor-pointer text-[13px] font-bold transition-colors flex items-center justify-center gap-1.5" onClick={() => setModal('cancel')}>
                   <X size={14} /> Cancel Subscription
                 </button>
               )}
@@ -211,16 +212,16 @@ export default function SubscriptionPage() {
             {/* Features */}
             {(sub.planVersionId?.features || sub.planId?.features) && (
               <div>
-                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>Included Features</p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <p className="m-0 mb-3 text-xs font-bold text-text-muted uppercase tracking-wider">Included Features</p>
+                <div className="flex flex-wrap gap-2">
                   {Object.entries(sub.planVersionId?.features instanceof Map
                     ? Object.fromEntries(sub.planVersionId.features)
                     : (sub.planVersionId?.features || sub.planId?.features || {})
                   )
                   .filter(([, v]) => v !== false)
                   .map(([k, v]) => (
-                    <span key={k} className="signal-tag">
-                      {v === true ? <Check size={10} style={{ marginRight: 4 }} /> : null}
+                    <span key={k} className="inline-flex items-center px-2 py-1 rounded bg-surface-secondary/50 border border-border text-[11px] font-semibold text-text-secondary whitespace-nowrap capitalize">
+                      {v === true ? <Check size={12} className="mr-1 text-primary" /> : null}
                       {k.replace(/_/g, ' ')}
                       {typeof v === 'number' ? `: ${v}` : ''}
                     </span>
@@ -234,11 +235,11 @@ export default function SubscriptionPage() {
         {/* Plan Cards */}
         {plans.length > 0 && (
           <>
-            <h2 className="section-title" style={{ marginTop: 8 }}>
-              <Zap size={16} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} />
+            <h2 className="m-0 mb-5 mt-2 text-lg font-bold text-text-primary flex items-center gap-2">
+              <Zap size={16} className="text-primary" />
               Available Plans
             </h2>
-            <div className="plan-cards">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-5 items-stretch">
               {plans.map((plan) => {
                 const isCurrent = plan._id?.toString() === currentPlanId;
                 const currentPrice = sub?.planVersionId?.price || sub?.planId?.price || 0;
@@ -246,26 +247,26 @@ export default function SubscriptionPage() {
                 const isGrowth  = plan.name === 'growth' || plan.displayName === 'Growth';
                 const btnLabel  = !sub ? 'Subscribe →' : isCurrent ? null : isUpgrade ? 'Upgrade →' : 'Downgrade';
                 return (
-                  <div key={plan._id} className={`plan-card${isCurrent ? ' current' : ''}${isGrowth ? ' featured' : ''}`}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+                  <div key={plan._id} className={`flex flex-col bg-surface border rounded-2xl p-6 transition-all ${isGrowth ? 'border-primary/50 shadow-[0_4px_24px_rgba(108,99,255,0.1)] -translate-y-1' : 'border-border shadow-sm'}`}>
+                    <p className="m-0 mb-2 text-[13px] font-bold text-text-muted uppercase tracking-wider">
                       {plan.displayName || plan.plan?.name || plan.name}
                     </p>
-                    <div className="plan-price">
+                    <div className="m-0 mb-5 text-4xl font-extrabold text-text-primary flex items-baseline gap-1">
                       {formatCurrency(plan.price)}
-                      <span>/{plan.interval === 'annual' ? 'yr' : 'mo'}</span>
+                      <span className="text-[15px] font-medium text-text-muted">/{plan.interval === 'annual' ? 'yr' : 'mo'}</span>
                     </div>
-                    <ul className="plan-features">
-                      <li>Up to {plan.features?.max_seats || '∞'} seats</li>
-                      {plan.features?.ai_assistant && <li>AI Billing Assistant</li>}
-                      {plan.features?.advanced_analytics && <li>Advanced Analytics</li>}
-                      {plan.features?.priority_support && <li>Priority Support</li>}
-                      {plan.features?.api_access && <li>API Access</li>}
+                    <ul className="list-none p-0 m-0 mb-6 flex-1 space-y-3">
+                      <li className="flex items-start gap-2.5 text-[13px] text-text-secondary"><Check size={16} className="text-primary shrink-0" /> Up to {plan.features?.max_seats || '∞'} seats</li>
+                      {plan.features?.ai_assistant && <li className="flex items-start gap-2.5 text-[13px] text-text-secondary"><Check size={16} className="text-primary shrink-0" /> AI Billing Assistant</li>}
+                      {plan.features?.advanced_analytics && <li className="flex items-start gap-2.5 text-[13px] text-text-secondary"><Check size={16} className="text-primary shrink-0" /> Advanced Analytics</li>}
+                      {plan.features?.priority_support && <li className="flex items-start gap-2.5 text-[13px] text-text-secondary"><Check size={16} className="text-primary shrink-0" /> Priority Support</li>}
+                      {plan.features?.api_access && <li className="flex items-start gap-2.5 text-[13px] text-text-secondary"><Check size={16} className="text-primary shrink-0" /> API Access</li>}
                     </ul>
                     {isCurrent ? (
-                      <button className="btn-secondary btn-full" disabled>✓ Current Plan</button>
+                      <button className="w-full py-2.5 rounded-lg border border-border bg-surface-secondary text-text-muted font-bold text-sm cursor-default" disabled>✓ Current Plan</button>
                     ) : (
                       <button
-                        className={(!sub || isUpgrade) ? 'btn-primary btn-full' : 'btn-secondary btn-full'}
+                        className={`w-full py-2.5 rounded-lg border-none text-white font-bold text-sm cursor-pointer transition-colors flex items-center justify-center ${(!sub || isUpgrade) ? 'bg-primary hover:bg-primary-hover' : 'bg-surface-secondary text-text-muted hover:text-text-primary border border-border'}`}
                         onClick={() => openChangePlan(plan)}
                       >
                         {btnLabel}
@@ -280,21 +281,23 @@ export default function SubscriptionPage() {
 
         {/* Cancel Modal */}
         {modal === 'cancel' && (
-          <div className="modal-overlay" onClick={() => setModal(null)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
-                <AlertTriangle size={28} color="var(--color-danger)" />
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setModal(null)}>
+            <div className="bg-surface border border-border rounded-2xl shadow-xl w-full max-w-[440px] p-6 text-text-primary" onClick={(e) => e.stopPropagation()}>
+              <div className="flex gap-4 items-start mb-5">
+                <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle size={20} className="text-danger" />
+                </div>
                 <div>
-                  <h3 className="modal-title" style={{ margin: 0 }}>Cancel Subscription?</h3>
-                  <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginTop: 8 }}>
+                  <h3 className="m-0 text-xl font-bold mb-2">Cancel Subscription?</h3>
+                  <p className="m-0 text-sm text-text-muted leading-relaxed">
                     Your subscription will be cancelled at the end of the current billing period. You will retain full access until then.
                   </p>
                 </div>
               </div>
-              <div className="modal-actions">
-                <button className="btn-secondary" onClick={() => setModal(null)} disabled={actionLoading}>Keep Subscription</button>
-                <button className="btn-danger" onClick={confirmCancel} disabled={actionLoading}>
-                  {actionLoading ? <span className="btn-spinner" /> : 'Yes, Cancel'}
+              <div className="flex justify-end gap-2">
+                <button className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors disabled:opacity-70 disabled:cursor-not-allowed" onClick={() => setModal(null)} disabled={actionLoading}>Keep Subscription</button>
+                <button className="px-4 py-2 rounded-lg border-none bg-danger hover:bg-red-600 text-white cursor-pointer text-[13px] font-bold transition-colors flex items-center justify-center gap-1.5 min-w-[120px] disabled:opacity-70 disabled:cursor-not-allowed" onClick={confirmCancel} disabled={actionLoading}>
+                  {actionLoading ? <Loader2 size={15} className="animate-spin" /> : 'Yes, Cancel'}
                 </button>
               </div>
             </div>
@@ -303,36 +306,36 @@ export default function SubscriptionPage() {
 
         {/* Change Plan Modal */}
         {modal?.type === 'change' && (
-          <div className="modal-overlay" onClick={() => setModal(null)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h3 className="modal-title">
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setModal(null)}>
+            <div className="bg-surface border border-border rounded-2xl shadow-xl w-full max-w-[440px] p-6 text-text-primary" onClick={(e) => e.stopPropagation()}>
+              <h3 className="m-0 text-xl font-bold mb-4">
                 Change to {modal.plan?.plan?.name || modal.plan?.name}?
               </h3>
               {preview ? (
-                <div style={{ background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: 16, marginBottom: 16, fontSize: 14 }}>
-                  <p style={{ marginBottom: 8, fontWeight: 500 }}>Proration Preview:</p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ color: 'var(--color-text-muted)' }}>Credit (remaining days):</span>
-                    <span style={{ color: 'var(--color-success)' }}>−{formatCurrency(preview.creditAmount || 0)}</span>
+                <div className="bg-surface-secondary/40 border border-border rounded-xl p-4 mb-5 text-[13px]">
+                  <p className="m-0 mb-3 font-semibold text-text-primary">Proration Preview:</p>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-text-muted">Credit (remaining days):</span>
+                    <span className="text-success font-medium">−{formatCurrency(preview.creditAmount || 0)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ color: 'var(--color-text-muted)' }}>New plan charge:</span>
-                    <span>{formatCurrency(preview.chargeAmount || 0)}</span>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-text-muted">New plan charge:</span>
+                    <span className="text-text-primary font-medium">{formatCurrency(preview.chargeAmount || 0)}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, borderTop: '1px solid var(--color-border)', paddingTop: 8, marginTop: 4 }}>
-                    <span>Net due today:</span>
-                    <span style={{ color: 'var(--color-primary)' }}>{formatCurrency(Math.max(0, preview.netAmount || 0))}</span>
+                  <div className="flex justify-between font-bold border-t border-border pt-3 mt-3">
+                    <span className="text-text-primary">Net due today:</span>
+                    <span className="text-primary text-base">{formatCurrency(Math.max(0, preview.netAmount || 0))}</span>
                   </div>
                 </div>
               ) : (
-                <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginBottom: 16 }}>
+                <p className="m-0 text-[13px] text-text-muted mb-5">
                   Your plan will be changed immediately with prorated billing.
                 </p>
               )}
-              <div className="modal-actions">
-                <button className="btn-secondary" onClick={() => setModal(null)} disabled={actionLoading}>Cancel</button>
-                <button className="btn-primary" onClick={confirmChangePlan} disabled={actionLoading}>
-                  {actionLoading ? <span className="btn-spinner" /> : 'Confirm Change'}
+              <div className="flex justify-end gap-2">
+                <button className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors disabled:opacity-70 disabled:cursor-not-allowed" onClick={() => setModal(null)} disabled={actionLoading}>Cancel</button>
+                <button className="px-4 py-2 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 min-w-[140px] disabled:opacity-70 disabled:cursor-not-allowed" onClick={confirmChangePlan} disabled={actionLoading}>
+                  {actionLoading ? <Loader2 size={15} className="animate-spin" /> : 'Confirm Change'}
                 </button>
               </div>
             </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock, Loader2, ArrowLeft } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout.jsx';
 import { updateMe, changePassword as changePasswordApi } from '../../services/authService.js';
 import { updateUser, logout } from '../../store/authSlice.js';
@@ -70,55 +70,33 @@ export default function ProfilePage() {
     }
   };
 
-  const pwdInpStyle = {
-    width: '100%', padding: '8px 36px 8px 12px', borderRadius: 8,
-    border: '1px solid rgba(108,99,255,0.4)', background: 'rgba(255,255,255,0.05)',
-    color: '#f0f0ff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-  };
-  const eyeBtn = {
-    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-    background: 'none', border: 'none', color: '#8b8bad', cursor: 'pointer', padding: 0,
-  };
-
   return (
-    <DashboardLayout>
-      <div style={{ maxWidth: 640, margin: '0 auto' }}>
+    <DashboardLayout title="My Profile">
+      <div className="max-w-[640px] mx-auto font-sans text-text-primary">
         {/* Header */}
-        <div style={{ marginBottom: 32 }}>
+        <div className="mb-8">
           <button
             onClick={() => navigate(-1)}
-            style={{ background: 'none', border: 'none', color: '#8b8bad', cursor: 'pointer', fontSize: 13, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}
+            className="flex items-center gap-1.5 bg-transparent border-none text-text-muted hover:text-text-primary cursor-pointer text-[13px] mb-3 transition-colors p-0"
           >
-            ← Back
+            <ArrowLeft size={14} /> Back
           </button>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#f0f0ff' }}>My Profile</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 14, color: '#8b8bad' }}>Manage your personal information and security</p>
+          <h1 className="m-0 text-2xl font-bold text-text-primary">My Profile</h1>
+          <p className="m-0 mt-1 text-sm text-text-muted">Manage your personal information and security</p>
         </div>
 
         {/* Avatar card */}
-        <div style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '28px 28px', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <div style={{
-              width: 72, height: 72, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6c63ff, #a78bfa)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 26, fontWeight: 700, color: '#fff',
-              boxShadow: '0 0 24px rgba(108,99,255,0.4)',
-              flexShrink: 0,
-            }}>
+        <div className="bg-surface border border-border rounded-2xl p-7 mb-5 shadow-sm">
+          <div className="flex items-center gap-5">
+            <div className="w-[72px] h-[72px] rounded-full bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center text-[26px] font-bold text-white shrink-0 shadow-[0_0_24px_rgba(108,99,255,0.4)]">
               {initials}
             </div>
             <div>
-              <p style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#f0f0ff' }}>
+              <p className="m-0 text-xl font-bold text-text-primary">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p style={{ margin: '2px 0 0', fontSize: 13, color: '#8b8bad' }}>{user?.email}</p>
-              <span style={{
-                display: 'inline-block', marginTop: 6,
-                padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                background: 'rgba(108,99,255,0.15)', color: '#a78bfa',
-                textTransform: 'capitalize',
-              }}>
+              <p className="m-0 mt-0.5 text-[13px] text-text-muted">{user?.email}</p>
+              <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary uppercase tracking-wider">
                 {user?.role?.replace(/_/g, ' ')}
               </span>
             </div>
@@ -126,54 +104,54 @@ export default function ProfilePage() {
         </div>
 
         {/* Personal Information card */}
-        <div style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '28px 28px', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f0f0ff' }}>Personal Information</h2>
+        <div className="bg-surface border border-border rounded-2xl p-7 mb-5 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="m-0 text-base font-bold text-text-primary">Personal Information</h2>
             {!editing && (
               <button
                 onClick={() => { setEditing(true); setSuccess(''); setError(''); }}
-                style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid rgba(108,99,255,0.4)', background: 'rgba(108,99,255,0.1)', color: '#a78bfa', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                className="px-4 py-1.5 rounded-lg border border-primary/40 bg-primary/10 text-primary cursor-pointer text-[13px] font-semibold transition-colors hover:bg-primary/20"
               >
                 Edit
               </button>
             )}
           </div>
 
-          {success && <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: '#4ade80', fontSize: 13 }}>{success}</div>}
-          {error   && <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)',  border: '1px solid rgba(239,68,68,0.25)',  color: '#f87171', fontSize: 13 }}>{error}</div>}
+          {success && <div className="mb-4 p-3 rounded-lg bg-success/10 border border-success/20 text-success text-[13px] font-medium">{success}</div>}
+          {error   && <div className="mb-4 p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-[13px] font-medium">{error}</div>}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="grid grid-cols-2 gap-4">
             <Field label="First Name">
               {editing
-                ? <input value={firstName} onChange={(e) => setFirstName(e.target.value)} style={inputStyle} />
+                ? <input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-border bg-surface-secondary/50 text-text-primary text-sm outline-none focus:border-primary transition-colors" />
                 : <Value>{user?.firstName || '—'}</Value>}
             </Field>
             <Field label="Last Name">
               {editing
-                ? <input value={lastName} onChange={(e) => setLastName(e.target.value)} style={inputStyle} />
+                ? <input value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-border bg-surface-secondary/50 text-text-primary text-sm outline-none focus:border-primary transition-colors" />
                 : <Value>{user?.lastName || '—'}</Value>}
             </Field>
             <Field label="Email Address">
               <Value muted>{user?.email}</Value>
-              <span style={{ fontSize: 11, color: '#8b8bad' }}>Cannot be changed</span>
+              <span className="text-[11px] text-text-muted">Cannot be changed</span>
             </Field>
             <Field label="Role">
-              <Value muted style={{ textTransform: 'capitalize' }}>{user?.role?.replace(/_/g, ' ')}</Value>
+              <Value muted className="capitalize">{user?.role?.replace(/_/g, ' ')}</Value>
             </Field>
           </div>
 
           {editing && (
-            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+            <div className="flex gap-2.5 mt-6">
               <button
                 onClick={handleSave}
                 disabled={loading}
-                style={{ padding: '9px 22px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg, #6c63ff, #a78bfa)', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+                className="px-5 py-2 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-sm font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {loading ? 'Saving…' : 'Save Changes'}
+                {loading ? <Loader2 size={16} className="animate-spin" /> : 'Save Changes'}
               </button>
               <button
                 onClick={() => { setEditing(false); setFirstName(user?.firstName || ''); setLastName(user?.lastName || ''); setError(''); }}
-                style={{ padding: '9px 22px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#8b8bad', cursor: 'pointer', fontSize: 14 }}
+                className="px-5 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-sm font-semibold transition-colors"
               >
                 Cancel
               </button>
@@ -182,24 +160,24 @@ export default function ProfilePage() {
         </div>
 
         {/* Change Password card */}
-        <div style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '28px 28px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: pwdOpen ? 24 : 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Lock size={16} color="#a78bfa" />
-              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f0f0ff' }}>Change Password</h2>
+        <div className="bg-surface border border-border rounded-2xl p-7 shadow-sm">
+          <div className={`flex items-center justify-between ${pwdOpen ? 'mb-6' : 'mb-0'}`}>
+            <div className="flex items-center gap-2.5">
+              <Lock size={16} className="text-primary" />
+              <h2 className="m-0 text-base font-bold text-text-primary">Change Password</h2>
             </div>
             <button
               onClick={() => { setPwdOpen(v => !v); setPwdError(''); setPwdSuccess(''); setCurPwd(''); setNewPwd(''); setConfPwd(''); }}
-              style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid rgba(108,99,255,0.4)', background: 'rgba(108,99,255,0.1)', color: '#a78bfa', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+              className="px-4 py-1.5 rounded-lg border border-primary/40 bg-primary/10 text-primary cursor-pointer text-[13px] font-semibold transition-colors hover:bg-primary/20"
             >
               {pwdOpen ? 'Cancel' : 'Change'}
             </button>
           </div>
 
           {pwdOpen && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {pwdError   && <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', fontSize: 13 }}>{pwdError}</div>}
-              {pwdSuccess && <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(34,197,94,0.1)',  border: '1px solid rgba(34,197,94,0.25)',  color: '#4ade80', fontSize: 13 }}>{pwdSuccess}</div>}
+            <div className="flex flex-col gap-4">
+              {pwdError   && <div className="p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-[13px] font-medium">{pwdError}</div>}
+              {pwdSuccess && <div className="p-3 rounded-lg bg-success/10 border border-success/20 text-success text-[13px] font-medium">{pwdSuccess}</div>}
 
               {[
                 { label: 'Current Password', val: curPwd, set: setCurPwd, show: showCur, setShow: setShowCur },
@@ -207,10 +185,10 @@ export default function ProfilePage() {
                 { label: 'Confirm New',      val: confPwd,set: setConfPwd,show: showConf,setShow: setShowConf },
               ].map(({ label, val, set, show, setShow }) => (
                 <div key={label}>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#8b8bad', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</label>
-                  <div style={{ position: 'relative' }}>
-                    <input type={show ? 'text' : 'password'} value={val} onChange={e => set(e.target.value)} style={pwdInpStyle} placeholder="••••••••" />
-                    <button type="button" onClick={() => setShow(v => !v)} style={eyeBtn}>
+                  <label className="block text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5">{label}</label>
+                  <div className="relative">
+                    <input type={show ? 'text' : 'password'} value={val} onChange={e => set(e.target.value)} className="w-full px-3 pr-9 py-2 rounded-lg border border-border bg-surface-secondary/50 text-text-primary text-sm outline-none focus:border-primary transition-colors" placeholder="••••••••" />
+                    <button type="button" onClick={() => setShow(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-transparent border-none text-text-muted hover:text-text-primary cursor-pointer p-0 flex items-center justify-center">
                       {show ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
@@ -220,13 +198,13 @@ export default function ProfilePage() {
               <button
                 onClick={handlePasswordChange}
                 disabled={pwdLoading}
-                style={{ marginTop: 4, padding: '10px 22px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#6c63ff,#a78bfa)', color: '#fff', cursor: pwdLoading ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600, opacity: pwdLoading ? 0.7 : 1 }}
+                className="mt-1 px-5 py-2.5 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-sm font-semibold transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               >
-                {pwdLoading ? 'Updating…' : 'Update Password'}
+                {pwdLoading ? <Loader2 size={16} className="animate-spin" /> : 'Update Password'}
               </button>
 
-              <p style={{ margin: 0, fontSize: 12, color: '#8b8bad' }}>
-                ⚠ Changing your password will log you out of all active sessions.
+              <p className="m-0 text-xs text-text-muted">
+                <span className="text-warning">⚠</span> Changing your password will log you out of all active sessions.
               </p>
             </div>
           )}
@@ -239,16 +217,11 @@ export default function ProfilePage() {
 function Field({ label, children }) {
   return (
     <div>
-      <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 600, color: '#8b8bad', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</p>
+      <p className="m-0 mb-1 text-[11px] font-bold text-text-muted uppercase tracking-wider">{label}</p>
       {children}
     </div>
   );
 }
-function Value({ children, muted, style: s }) {
-  return <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: muted ? '#c4c4d4' : '#f0f0ff', ...s }}>{children}</p>;
+function Value({ children, muted, className = '' }) {
+  return <p className={`m-0 text-sm font-medium ${muted ? 'text-text-muted' : 'text-text-primary'} ${className}`}>{children}</p>;
 }
-const inputStyle = {
-  width: '100%', padding: '8px 12px', borderRadius: 8,
-  border: '1px solid rgba(108,99,255,0.4)', background: 'rgba(255,255,255,0.05)',
-  color: '#f0f0ff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-};

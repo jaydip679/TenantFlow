@@ -6,29 +6,20 @@ import {
 } from 'recharts';
 import {
   TrendingUp, TrendingDown, DollarSign, AlertTriangle,
-  Calendar, Users, BarChart2, RefreshCw, Zap, Cpu,
+  Calendar, Users, BarChart2, RefreshCw, Zap, Cpu, Loader2,
 } from 'lucide-react';
 import AdminLayout from '../../components/layout/AdminLayout.jsx';
 import { getMrrMovements, getCashFlowForecast, getCohortRetention, getForecast, triggerForecast } from '../../services/adminService.js';
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// ── Colors for Recharts ────────────────────────────────────────────────────────
 const ACCENT   = '#6c63ff';
 const GREEN    = '#4ade80';
 const RED      = '#f87171';
 const ORANGE   = '#fb923c';
 const BLUE     = '#60a5fa';
 const PURPLE   = '#c084fc';
-const MUTED    = '#8b8bad';
-const TEXT     = '#f0f0ff';
-const CARD_BG  = 'rgba(255,255,255,0.04)';
-const BORDER   = 'rgba(255,255,255,0.08)';
-
-const card = {
-  background: CARD_BG,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 16,
-  padding: '24px 24px',
-};
+const MUTED    = 'var(--color-text-muted)';
+const BORDER   = 'var(--color-border)';
 
 function formatINR(paise) {
   if (paise == null) return '—';
@@ -36,21 +27,21 @@ function formatINR(paise) {
   return '₹' + r.toLocaleString('en-IN');
 }
 
-function KpiCard({ label, value, sub, icon: Icon, color = ACCENT, trend, badge }) {
+function KpiCard({ label, value, sub, icon: Icon, colorClass = 'text-primary', bgClass = 'bg-primary/15', badge }) {
   return (
-    <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={15} color={color} />
+    <div className="bg-surface border border-border rounded-2xl p-5 flex flex-col gap-2.5 shadow-sm transition-colors hover:border-border/80">
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-semibold text-text-muted uppercase tracking-[0.06em]">{label}</span>
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${bgClass}`}>
+          <Icon size={15} className={colorClass} />
         </div>
       </div>
       <div>
-        <p style={{ margin: 0, fontSize: 26, fontWeight: 700, color: TEXT, letterSpacing: '-0.02em' }}>{value}</p>
-        {sub && <p style={{ margin: '3px 0 0', fontSize: 12, color: MUTED }}>{sub}</p>}
+        <p className="m-0 text-[26px] font-bold text-text-primary tracking-tight leading-none">{value}</p>
+        {sub && <p className="m-0 mt-1.5 text-[12px] text-text-muted font-medium">{sub}</p>}
       </div>
       {badge && (
-        <span style={{ alignSelf: 'flex-start', padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: `${badge.color}22`, color: badge.color }}>
+        <span className={`self-start px-2.5 py-1 rounded-full text-[11px] font-bold ${badge.bgClass} ${badge.colorClass}`}>
           {badge.label}
         </span>
       )}
@@ -62,10 +53,10 @@ function KpiCard({ label, value, sub, icon: Icon, color = ACCENT, trend, badge }
 function MrrTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: '#1a1a2e', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '10px 14px', fontSize: 12, color: TEXT }}>
-      <p style={{ margin: '0 0 8px', fontWeight: 600, color: TEXT }}>{label}</p>
+    <div className="bg-surface border border-border rounded-xl px-3.5 py-2.5 text-[12px] text-text-primary shadow-md">
+      <p className="m-0 mb-2 font-bold text-text-primary">{label}</p>
       {payload.map(p => (
-        <p key={p.name} style={{ margin: '2px 0', color: p.fill || p.color }}>
+        <p key={p.name} className="m-0 my-1 font-medium" style={{ color: p.fill || p.color }}>
           {p.name}: {formatINR(p.value * 100)}
         </p>
       ))}
@@ -75,10 +66,10 @@ function MrrTooltip({ active, payload, label }) {
 
 function SectionHeader({ title, subtitle, action }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 20 }}>
+    <div className="flex items-end justify-between mb-5 gap-4">
       <div>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: TEXT }}>{title}</h2>
-        {subtitle && <p style={{ margin: '4px 0 0', fontSize: 13, color: MUTED }}>{subtitle}</p>}
+        <h2 className="m-0 text-[18px] font-bold text-text-primary">{title}</h2>
+        {subtitle && <p className="m-0 mt-1 text-[13px] text-text-muted">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -92,7 +83,11 @@ function MrrWaterfall({ data, loading }) {
 
   // Latest month summary
   const latest   = data[data.length - 1];
-  const nrrColor = latest?.nrr >= 100 ? GREEN : latest?.nrr >= 80 ? ORANGE : RED;
+  const nrrColorClass = latest?.nrr >= 100 ? 'text-emerald-500' : latest?.nrr >= 80 ? 'text-orange-500' : 'text-red-500';
+  const nrrBgClass = latest?.nrr >= 100 ? 'bg-emerald-500/15' : latest?.nrr >= 80 ? 'bg-orange-500/15' : 'bg-red-500/15';
+
+  const qrColorClass = latest?.quickRatio >= 4 ? 'text-emerald-500' : latest?.quickRatio >= 2 ? 'text-orange-500' : 'text-red-500';
+  const qrBgClass = latest?.quickRatio >= 4 ? 'bg-emerald-500/15' : latest?.quickRatio >= 2 ? 'bg-orange-500/15' : 'bg-red-500/15';
 
   const chartData = data.map(d => ({
     month:       d.month,
@@ -107,81 +102,89 @@ function MrrWaterfall({ data, loading }) {
   }));
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="flex flex-col gap-5">
       {/* KPI row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Ending MRR"
           value={formatINR((latest?.endingMrr || 0))}
           sub={`Net New: ${latest?.netNewMrr >= 0 ? '+' : ''}${formatINR(latest?.netNewMrr || 0)}`}
-          icon={DollarSign} color={ACCENT}
+          icon={DollarSign} colorClass="text-primary" bgClass="bg-primary/15"
         />
         <KpiCard
           label="Net Revenue Retention"
           value={`${latest?.nrr ?? '—'}%`}
           sub="NRR > 100% = net growth"
-          icon={TrendingUp} color={nrrColor}
-          badge={{ label: latest?.nrr >= 100 ? '🟢 Healthy' : latest?.nrr >= 80 ? '🟡 Watch' : '🔴 At Risk', color: nrrColor }}
+          icon={TrendingUp} colorClass={nrrColorClass} bgClass={nrrBgClass}
+          badge={{ label: latest?.nrr >= 100 ? '🟢 Healthy' : latest?.nrr >= 80 ? '🟡 Watch' : '🔴 At Risk', colorClass: nrrColorClass, bgClass: nrrBgClass }}
         />
         <KpiCard
           label="Quick Ratio"
           value={latest?.quickRatio != null ? `${latest.quickRatio}×` : 'N/A'}
           sub="Growth ÷ Churn. Target: >4"
-          icon={BarChart2} color={BLUE}
-          badge={latest?.quickRatio != null ? { label: latest.quickRatio >= 4 ? '🟢 Strong' : latest.quickRatio >= 2 ? '🟡 Ok' : '🔴 Low', color: latest.quickRatio >= 4 ? GREEN : latest.quickRatio >= 2 ? ORANGE : RED } : null}
+          icon={BarChart2} colorClass="text-blue-500" bgClass="bg-blue-500/15"
+          badge={latest?.quickRatio != null ? { label: latest.quickRatio >= 4 ? '🟢 Strong' : latest.quickRatio >= 2 ? '🟡 Ok' : '🔴 Low', colorClass: qrColorClass, bgClass: qrBgClass } : null}
         />
         <KpiCard
           label="Churned MRR"
           value={formatINR(latest?.churnedMrr || 0)}
           sub={`Expansion: ${formatINR(latest?.expansionMrr || 0)}`}
-          icon={TrendingDown} color={RED}
+          icon={TrendingDown} colorClass="text-red-500" bgClass="bg-red-500/15"
         />
       </div>
 
       {/* Stacked Bar Chart */}
-      <div style={card}>
-        <p style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600, color: TEXT }}>Monthly MRR Movements</p>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barGap={4}>
-            <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
-            <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={v => `₹${Math.abs(v).toLocaleString('en-IN')}`} tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={72} />
-            <Tooltip content={<MrrTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 12, color: MUTED }} />
-            <Bar dataKey="New MRR"      fill={GREEN}  radius={[3,3,0,0]} stackId="pos" />
-            <Bar dataKey="Expansion"    fill={BLUE}   radius={[3,3,0,0]} stackId="pos" />
-            <Bar dataKey="Reactivation" fill={PURPLE} radius={[3,3,0,0]} stackId="pos" />
-            <Bar dataKey="Contraction"  fill={ORANGE} radius={[0,0,3,3]} stackId="neg" />
-            <Bar dataKey="Churned"      fill={RED}    radius={[0,0,3,3]} stackId="neg" />
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
+        <p className="m-0 mb-4 text-[14px] font-semibold text-text-primary">Monthly MRR Movements</p>
+        <div className="h-[260px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }} barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+              <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={v => `₹${Math.abs(v).toLocaleString('en-IN')}`} tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={72} />
+              <Tooltip content={<MrrTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 12, color: MUTED }} />
+              <Bar dataKey="New MRR"      fill={GREEN}  radius={[3,3,0,0]} stackId="pos" />
+              <Bar dataKey="Expansion"    fill={BLUE}   radius={[3,3,0,0]} stackId="pos" />
+              <Bar dataKey="Reactivation" fill={PURPLE} radius={[3,3,0,0]} stackId="pos" />
+              <Bar dataKey="Contraction"  fill={ORANGE} radius={[0,0,3,3]} stackId="neg" />
+              <Bar dataKey="Churned"      fill={RED}    radius={[0,0,3,3]} stackId="neg" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Data table */}
-      <div style={card}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-              {['Month','Begin','New','Expansion','Contraction','Churned','Net New','Ending','NRR','QR'].map(h => (
-                <th key={h} style={{ padding: '6px 10px', textAlign: 'right', color: MUTED, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10, whiteSpace: 'nowrap' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map(d => (
-              <tr key={d.month} style={{ borderBottom: `1px solid ${BORDER}` }}>
-                <td style={{ padding: '7px 10px', color: TEXT, fontWeight: 600 }}>{d.month}</td>
-                {[d.beginMrr, d.newMrr, d.expansionMrr, d.contractionMrr, d.churnedMrr, d.netNewMrr, d.endingMrr].map((v, i) => (
-                  <td key={i} style={{ padding: '7px 10px', textAlign: 'right', color: [5].includes(i) ? (v >= 0 ? GREEN : RED) : TEXT, fontFamily: 'monospace' }}>
-                    {i === 5 && v >= 0 ? '+' : ''}{formatINR(v)}
-                  </td>
+      <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-[12px]">
+            <thead>
+              <tr className="border-b border-border bg-surface-secondary/50">
+                {['Month','Begin','New','Expansion','Contraction','Churned','Net New','Ending','NRR','QR'].map(h => (
+                  <th key={h} className="px-3.5 py-2.5 text-right font-semibold text-text-muted uppercase tracking-[0.05em] text-[10px] whitespace-nowrap first:text-left">{h}</th>
                 ))}
-                <td style={{ padding: '7px 10px', textAlign: 'right', color: d.nrr >= 100 ? GREEN : d.nrr >= 80 ? ORANGE : RED, fontWeight: 600 }}>{d.nrr ?? '—'}%</td>
-                <td style={{ padding: '7px 10px', textAlign: 'right', color: MUTED }}>{d.quickRatio != null ? `${d.quickRatio}×` : '—'}</td>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.map(d => (
+                <tr key={d.month} className="border-b border-border transition-colors hover:bg-surface-secondary/40 last:border-0">
+                  <td className="px-3.5 py-2.5 text-text-primary font-bold">{d.month}</td>
+                  {[d.beginMrr, d.newMrr, d.expansionMrr, d.contractionMrr, d.churnedMrr, d.netNewMrr, d.endingMrr].map((v, i) => (
+                    <td key={i} className={`px-3.5 py-2.5 text-right font-mono font-medium whitespace-nowrap ${
+                      [5].includes(i) ? (v >= 0 ? 'text-emerald-500' : 'text-red-500') : 'text-text-primary'
+                    }`}>
+                      {i === 5 && v >= 0 ? '+' : ''}{formatINR(v)}
+                    </td>
+                  ))}
+                  <td className={`px-3.5 py-2.5 text-right font-bold whitespace-nowrap ${
+                    d.nrr >= 100 ? 'text-emerald-500' : d.nrr >= 80 ? 'text-orange-500' : 'text-red-500'
+                  }`}>{d.nrr ?? '—'}%</td>
+                  <td className="px-3.5 py-2.5 text-right text-text-muted font-medium whitespace-nowrap">{d.quickRatio != null ? `${d.quickRatio}×` : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -193,27 +196,27 @@ function CashFlowCalendar({ data, loading }) {
   if (!data?.length) return <Empty msg="No upcoming renewals" />;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {data.map(m => {
         const atRiskPct = m.expectedMrr > 0 ? Math.round((m.atRiskMrr / m.expectedMrr) * 100) : 0;
         return (
-          <div key={m.month} style={{ ...card, position: 'relative', overflow: 'hidden' }}>
+          <div key={m.month} className="bg-surface border border-border rounded-2xl p-6 relative overflow-hidden shadow-sm hover:border-border/80 transition-colors">
             {/* Accent bar at top */}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${ACCENT},#a78bfa)` }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{m.month}</span>
-              <Calendar size={15} color={MUTED} />
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-primary to-purple-400 opacity-90" />
+            <div className="flex items-center justify-between mb-4 mt-1">
+              <span className="text-[14px] font-bold text-text-primary">{m.month}</span>
+              <Calendar size={15} className="text-text-muted" />
             </div>
-            <p style={{ margin: '0 0 4px', fontSize: 24, fontWeight: 700, color: TEXT }}>{formatINR(m.expectedMrr)}</p>
-            <p style={{ margin: '0 0 16px', fontSize: 12, color: MUTED }}>{m.renewalCount} renewal{m.renewalCount !== 1 ? 's' : ''}</p>
+            <p className="m-0 mb-1 text-[24px] font-bold text-text-primary leading-tight">{formatINR(m.expectedMrr)}</p>
+            <p className="m-0 mb-4 text-[12px] font-medium text-text-muted">{m.renewalCount} renewal{m.renewalCount !== 1 ? 's' : ''}</p>
             {m.atRiskMrr > 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)' }}>
-                <AlertTriangle size={13} color={RED} />
-                <span style={{ fontSize: 12, color: RED }}>{formatINR(m.atRiskMrr)} at risk ({atRiskPct}%)</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                <AlertTriangle size={13} className="text-red-500" />
+                <span className="text-[12px] font-semibold text-red-500">{formatINR(m.atRiskMrr)} at risk ({atRiskPct}%)</span>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.15)' }}>
-                <span style={{ fontSize: 12, color: GREEN }}>✓ No at-risk renewals</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <span className="text-[12px] font-semibold text-emerald-500">✓ No at-risk renewals</span>
               </div>
             )}
           </div>
@@ -235,23 +238,23 @@ function CohortHeatMap({ data, loading }) {
     if (pct >= 60) return `rgba(251,146,60,${0.1 + (100-pct) / 300})`;
     return `rgba(248,113,113,${0.12 + (100-pct) / 250})`;
   }
-  function cellText(pct) {
-    if (pct >= 85) return GREEN;
-    if (pct >= 60) return ORANGE;
-    return RED;
+  function cellTextClass(pct) {
+    if (pct >= 85) return 'text-emerald-500';
+    if (pct >= 60) return 'text-orange-500';
+    return 'text-red-500';
   }
 
   const maxCols = Math.max(...data.map(d => d.retention.length));
 
   return (
-    <div style={{ ...card, overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '3px', fontSize: 12, tableLayout: 'fixed' }}>
+    <div className="bg-surface border border-border rounded-2xl overflow-x-auto shadow-sm p-4">
+      <table className="w-full border-separate border-spacing-[3px] text-[12px] table-fixed min-w-[600px]">
         <thead>
           <tr>
-            <th style={{ textAlign: 'left', padding: '4px 10px', color: MUTED, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', width: 90 }}>Cohort</th>
-            <th style={{ padding: '4px 8px', color: MUTED, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'center', width: 60 }}>Size</th>
+            <th className="text-left px-2.5 py-1 text-text-muted font-semibold text-[11px] uppercase tracking-[0.06em] whitespace-nowrap w-[90px]">Cohort</th>
+            <th className="text-center px-2 py-1 text-text-muted font-semibold text-[11px] uppercase tracking-[0.06em] w-[60px]">Size</th>
             {Array.from({ length: maxCols }, (_, i) => (
-              <th key={i} style={{ padding: '4px 8px', color: MUTED, fontWeight: 600, fontSize: 11, textTransform: 'uppercase', textAlign: 'center', width: 60 }}>
+              <th key={i} className="text-center px-2 py-1 text-text-muted font-semibold text-[11px] uppercase w-[60px]">
                 M+{i}
               </th>
             ))}
@@ -260,21 +263,16 @@ function CohortHeatMap({ data, loading }) {
         <tbody>
           {data.map(row => (
             <tr key={row.cohort}>
-              <td style={{ padding: '5px 10px', color: TEXT, fontWeight: 600, whiteSpace: 'nowrap' }}>{row.cohort}</td>
-              <td style={{ padding: '5px 8px', textAlign: 'center', color: MUTED }}>{row.cohortSize}</td>
+              <td className="px-2.5 py-1.5 text-text-primary font-bold whitespace-nowrap">{row.cohort}</td>
+              <td className="px-2 py-1.5 text-center font-medium text-text-muted">{row.cohortSize}</td>
               {row.retention.map((pct, i) => (
-                <td key={i} style={{
-                  padding: '5px 8px', textAlign: 'center',
-                  background: cellColor(pct), borderRadius: 6,
-                  color: cellText(pct), fontWeight: 600,
-                  transition: 'all 0.15s',
-                }}>
+                <td key={i} className={`px-2 py-1.5 text-center font-bold rounded-lg transition-colors ${cellTextClass(pct)}`} style={{ background: cellColor(pct) }}>
                   {pct}%
                 </td>
               ))}
               {/* Empty cells for missing months */}
               {Array.from({ length: maxCols - row.retention.length }, (_, i) => (
-                <td key={`e-${i}`} style={{ padding: '5px 8px', textAlign: 'center', color: 'rgba(255,255,255,0.1)', fontSize: 10 }}>—</td>
+                <td key={`e-${i}`} className="px-2 py-1.5 text-center text-text-muted/30 text-[10px]">—</td>
               ))}
             </tr>
           ))}
@@ -287,15 +285,14 @@ function CohortHeatMap({ data, loading }) {
 // ── Utility components ────────────────────────────────────────────────────────
 function Skeleton({ h = 200 }) {
   return (
-    <div style={{ ...card, height: h, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: 36, height: 36, borderRadius: '50%', border: `3px solid ${ACCENT}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div className="bg-surface border border-border rounded-2xl flex items-center justify-center shadow-sm" style={{ height: h }}>
+      <Loader2 size={36} className="text-primary animate-spin" />
     </div>
   );
 }
 function Empty({ msg }) {
   return (
-    <div style={{ ...card, textAlign: 'center', padding: 48, color: MUTED, fontSize: 14 }}>{msg}</div>
+    <div className="bg-surface border border-border rounded-2xl text-center p-12 text-text-muted text-[14px] font-medium shadow-sm">{msg}</div>
   );
 }
 
@@ -303,22 +300,23 @@ function Empty({ msg }) {
 function ForecastChart({ data, loading, onTrigger, triggering }) {
   if (loading) return <Skeleton h={320} />;
   if (!data) return (
-    <div style={{ ...card, textAlign: 'center', padding: 60 }}>
-      <Cpu size={40} color={MUTED} style={{ margin: '0 auto 16px', display: 'block' }} />
-      <p style={{ margin: '0 0 6px', fontSize: 15, color: TEXT, fontWeight: 600 }}>No forecast generated yet</p>
-      <p style={{ margin: '0 0 20px', fontSize: 13, color: MUTED }}>Click the button below to compute a 3-month MRR forecast using linear regression + AI narrative.</p>
+    <div className="bg-surface border border-border rounded-2xl text-center p-16 shadow-sm">
+      <Cpu size={48} className="mx-auto mb-4 opacity-40 text-text-muted block" />
+      <p className="m-0 mb-1.5 text-[16px] text-text-primary font-bold">No forecast generated yet</p>
+      <p className="m-0 mb-5 text-[13px] text-text-muted max-w-sm mx-auto">Click the button below to compute a 3-month MRR forecast using linear regression + AI narrative.</p>
       <button
         onClick={onTrigger}
         disabled={triggering}
-        style={{ padding: '10px 24px', borderRadius: 9, border: 'none', background: `linear-gradient(135deg,${ACCENT},#a78bfa)`, color: '#fff', cursor: triggering ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600, opacity: triggering ? 0.7 : 1 }}
+        className="px-6 py-2.5 rounded-xl border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-[14px] font-semibold flex items-center gap-2 justify-center mx-auto transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
       >
-        {triggering ? 'Computing…' : '⚡ Generate Forecast'}
+        {triggering ? <Loader2 size={16} className="animate-spin" /> : '⚡'}
+        {triggering ? 'Computing…' : 'Generate Forecast'}
       </button>
     </div>
   );
 
   const { forecastMonths, trend, confidence, narrative, modelVersion, computedAt } = data;
-  const trendColor = trend === 'growth' ? GREEN : trend === 'decline' ? RED : ORANGE;
+  const trendColorClass = trend === 'growth' ? 'text-emerald-500' : trend === 'decline' ? 'text-red-500' : 'text-orange-500';
 
   // Build chart data
   const chartData = (forecastMonths || []).map(m => ({
@@ -328,98 +326,99 @@ function ForecastChart({ data, loading, onTrigger, triggering }) {
     high:     Math.round(m.high / 100),
   }));
 
-  function formatINR(v) {
-    return '₹' + v.toLocaleString('en-IN');
-  }
-
   const ForecastTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-      <div style={{ background: '#1a1a2e', border: `1px solid ${BORDER}`, borderRadius: 10, padding: '10px 14px', fontSize: 12, color: TEXT }}>
-        <p style={{ margin: '0 0 6px', fontWeight: 600 }}>{label}</p>
-        <p style={{ margin: '2px 0', color: ACCENT }}>Forecast: {formatINR(payload[0]?.payload?.forecast)}</p>
-        <p style={{ margin: '2px 0', color: MUTED, fontSize: 11 }}>Range: {formatINR(payload[0]?.payload?.low)} – {formatINR(payload[0]?.payload?.high)}</p>
+      <div className="bg-surface border border-border rounded-xl px-3.5 py-2.5 text-[12px] text-text-primary shadow-md">
+        <p className="m-0 mb-1.5 font-bold">{label}</p>
+        <p className="m-0 my-0.5 text-primary font-semibold">Forecast: {formatINR(payload[0]?.payload?.forecast)}</p>
+        <p className="m-0 my-0.5 text-text-muted text-[11px] font-medium">Range: {formatINR(payload[0]?.payload?.low)} &ndash; {formatINR(payload[0]?.payload?.high)}</p>
       </div>
     );
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="flex flex-col gap-5">
       {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-        <div style={card}>
-          <p style={{ margin: '0 0 6px', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Trend</p>
-          <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: trendColor }}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm">
+          <p className="m-0 mb-1.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.06em]">Trend</p>
+          <p className={`m-0 text-[22px] font-bold ${trendColorClass}`}>
             {trend === 'growth' ? '📈 Growth' : trend === 'decline' ? '📉 Decline' : '➡️ Stable'}
           </p>
         </div>
-        <div style={card}>
-          <p style={{ margin: '0 0 6px', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Confidence</p>
-          <p style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 700, color: confidence >= 70 ? GREEN : confidence >= 40 ? ORANGE : RED }}>{confidence}%</p>
-          <div style={{ width: '100%', height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)' }}>
-            <div style={{ width: `${confidence}%`, height: '100%', borderRadius: 2, background: confidence >= 70 ? GREEN : confidence >= 40 ? ORANGE : RED }} />
+        <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm">
+          <p className="m-0 mb-1.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.06em]">Confidence</p>
+          <p className={`m-0 mb-2 text-[22px] font-bold ${confidence >= 70 ? 'text-emerald-500' : confidence >= 40 ? 'text-orange-500' : 'text-red-500'}`}>{confidence}%</p>
+          <div className="w-full h-1.5 rounded bg-surface-secondary overflow-hidden">
+            <div 
+              className={`h-full rounded transition-all ${confidence >= 70 ? 'bg-emerald-500' : confidence >= 40 ? 'bg-orange-500' : 'bg-red-500'}`} 
+              style={{ width: `${confidence}%` }} 
+            />
           </div>
         </div>
-        <div style={card}>
-          <p style={{ margin: '0 0 6px', fontSize: 11, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>3-Month Projection</p>
-          <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: TEXT }}>
+        <div className="bg-surface border border-border rounded-2xl p-5 shadow-sm">
+          <p className="m-0 mb-1.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.06em]">3-Month Projection</p>
+          <p className="m-0 text-[22px] font-bold text-text-primary">
             {chartData.length ? formatINR(chartData[chartData.length - 1].forecast) : '—'}
           </p>
-          <p style={{ margin: '3px 0 0', fontSize: 11, color: MUTED }}>Ending MRR by {chartData[chartData.length - 1]?.month}</p>
+          <p className="m-0 mt-1 text-[11px] font-medium text-text-muted">Ending MRR by {chartData[chartData.length - 1]?.month}</p>
         </div>
       </div>
 
       {/* Area chart */}
-      <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: TEXT }}>3-Month MRR Forecast</p>
-          <span style={{ fontSize: 11, color: MUTED }}>Shaded band = ±1.5σ confidence interval</span>
+      <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <p className="m-0 text-[14px] font-bold text-text-primary">3-Month MRR Forecast</p>
+          <span className="text-[11px] font-medium text-text-muted">Shaded band = &plusmn;1.5&sigma; confidence interval</span>
         </div>
-        <ResponsiveContainer width="100%" height={240}>
-          <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor={ACCENT} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={ACCENT} stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
-            <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={v => `₹${v.toLocaleString('en-IN')}`} tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
-            <Tooltip content={<ForecastTooltip />} />
-            <Area type="monotone" dataKey="high"     stroke="transparent" fill={`${ACCENT}18`} />
-            <Area type="monotone" dataKey="forecast" stroke={ACCENT} strokeWidth={2.5} fill="url(#forecastGrad)" dot={{ fill: ACCENT, r: 5, strokeWidth: 2, stroke: '#1a1a2e' }} />
-            <Area type="monotone" dataKey="low"      stroke="transparent" fill="transparent" />
-          </AreaChart>
-        </ResponsiveContainer>
+        <div className="h-[240px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor={ACCENT} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={ACCENT} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+              <XAxis dataKey="month" tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={v => `₹${v.toLocaleString('en-IN')}`} tick={{ fill: MUTED, fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
+              <Tooltip content={<ForecastTooltip />} />
+              <Area type="monotone" dataKey="high"     stroke="transparent" fill={`${ACCENT}18`} />
+              <Area type="monotone" dataKey="forecast" stroke={ACCENT} strokeWidth={2.5} fill="url(#forecastGrad)" dot={{ fill: ACCENT, r: 5, strokeWidth: 2, stroke: '#1a1a2e' }} />
+              <Area type="monotone" dataKey="low"      stroke="transparent" fill="transparent" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* AI Narrative */}
       {narrative && (
-        <div style={{ ...card, border: `1px solid rgba(108,99,255,0.25)`, background: 'rgba(108,99,255,0.06)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <Cpu size={15} color={ACCENT} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#a78bfa' }}>AI Insight</span>
-            <span style={{ fontSize: 11, color: MUTED, marginLeft: 'auto' }}>via {modelVersion || 'AI'} · {computedAt ? new Date(computedAt).toLocaleString() : ''}</span>
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-2.5">
+            <Cpu size={15} className="text-primary" />
+            <span className="text-[12px] font-bold text-primary uppercase tracking-[0.05em]">AI Insight</span>
+            <span className="text-[11px] font-medium text-text-muted ml-auto">via {modelVersion || 'AI'} &middot; {computedAt ? new Date(computedAt).toLocaleString() : ''}</span>
           </div>
-          <p style={{ margin: 0, fontSize: 14, color: TEXT, lineHeight: 1.7 }}>{narrative}</p>
+          <p className="m-0 text-[14px] text-text-primary leading-relaxed font-medium">{narrative}</p>
         </div>
       )}
 
       {/* Trigger recompute */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div className="flex justify-end mt-2">
         <button
           onClick={onTrigger}
           disabled={triggering}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: `1px solid rgba(108,99,255,0.3)`, background: 'rgba(108,99,255,0.08)', color: '#a78bfa', cursor: triggering ? 'not-allowed' : 'pointer', fontSize: 13, opacity: triggering ? 0.7 : 1 }}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-primary/30 bg-primary/10 text-primary cursor-pointer text-[13px] font-semibold disabled:opacity-70 disabled:cursor-not-allowed hover:bg-primary/15 transition-colors"
         >
-          <Zap size={14} /> {triggering ? 'Computing…' : 'Recompute Forecast'}
+          {triggering ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />} 
+          {triggering ? 'Computing…' : 'Recompute Forecast'}
         </button>
       </div>
     </div>
   );
 }
-
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function RevenueIntelligencePage() {
@@ -485,21 +484,21 @@ export default function RevenueIntelligencePage() {
   ];
 
   return (
-    <AdminLayout>
-      <div style={{ color: TEXT }}>
+    <AdminLayout title="Revenue Intelligence">
+      <div className="font-sans text-text-primary max-w-6xl">
         {/* Header */}
-        <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-7">
           <div>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: TEXT, letterSpacing: '-0.02em' }}>
+            <h1 className="m-0 text-[26px] font-bold text-text-primary tracking-tight">
               Revenue Intelligence
             </h1>
-            <p style={{ margin: '4px 0 0', fontSize: 14, color: MUTED }}>
+            <p className="m-0 mt-1.5 text-sm text-text-muted">
               MRR waterfall, cohort retention, and 90-day renewal forecast
             </p>
           </div>
           <button
             onClick={loadAll}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: `1px solid ${BORDER}`, background: CARD_BG, color: MUTED, cursor: 'pointer', fontSize: 13 }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-surface text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors"
           >
             <RefreshCw size={14} />
             {lastRefresh ? `Updated ${lastRefresh.toLocaleTimeString()}` : 'Refresh'}
@@ -507,18 +506,14 @@ export default function RevenueIntelligencePage() {
         </div>
 
         {/* Tab Bar */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 4, alignSelf: 'flex-start', width: 'fit-content' }}>
+        <div className="flex gap-1.5 mb-7 bg-surface border border-border rounded-xl p-1.5 w-fit">
           {TABS.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '8px 18px', borderRadius: 9, border: 'none', cursor: 'pointer',
-                fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
-                background: tab === t.id ? ACCENT : 'transparent',
-                color:      tab === t.id ? '#fff'  : MUTED,
-              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border-none cursor-pointer text-[13px] font-bold transition-all ${
+                tab === t.id ? 'bg-primary text-white shadow-sm' : 'bg-transparent text-text-muted hover:text-text-primary'
+              }`}
             >
               <t.icon size={14} />
               {t.label}
@@ -553,10 +548,10 @@ export default function RevenueIntelligencePage() {
               title="Cohort Retention Heat-Map"
               subtitle="What % of each monthly cohort is still active M+1, M+2 ... months after signup"
             />
-            <div style={{ marginBottom: 12, display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: MUTED }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: 'rgba(74,222,128,0.4)', display: 'inline-block' }} />≥85% Healthy</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: 'rgba(251,146,60,0.4)', display: 'inline-block' }} />60–84% Watch</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: 'rgba(248,113,113,0.4)', display: 'inline-block' }} />&lt;60% At Risk</span>
+            <div className="flex gap-4 mb-4 flex-wrap text-[12px] font-semibold text-text-muted">
+              <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-emerald-500/40 inline-block" />&ge;85% Healthy</span>
+              <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-orange-500/40 inline-block" />60&ndash;84% Watch</span>
+              <span className="flex items-center gap-2"><span className="w-3 h-3 rounded bg-red-500/40 inline-block" />&lt;60% At Risk</span>
             </div>
             <CohortHeatMap data={cohortData} loading={cohortLoading} />
           </>
@@ -566,7 +561,7 @@ export default function RevenueIntelligencePage() {
           <>
             <SectionHeader
               title="3-Month Revenue Forecast"
-              subtitle="Deterministic linear regression on MRR trend · AI-generated narrative insight"
+              subtitle="Deterministic linear regression on MRR trend &middot; AI-generated narrative insight"
             />
             <ForecastChart
               data={forecastData}

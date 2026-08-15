@@ -2,65 +2,54 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart, RefreshCw, Zap, ExternalLink,
-  CheckCircle2, AlertTriangle, XCircle,
+  CheckCircle2, AlertTriangle, XCircle, Loader2,
 } from 'lucide-react';
 import AdminLayout from '../../components/layout/AdminLayout.jsx';
 import { getHealthScores, computeHealthScores } from '../../services/healthService.js';
 
-const TEXT   = '#f0f0ff';
-const MUTED  = '#8b8bad';
-const BORDER = 'rgba(255,255,255,0.08)';
-const CARD   = 'rgba(255,255,255,0.04)';
-const ACCENT = '#6c63ff';
-const GREEN  = '#4ade80';
-const BLUE   = '#60a5fa';
-const ORANGE = '#fb923c';
-const RED    = '#f87171';
-
 const GRADE_CONFIG = {
-  A: { color: GREEN,  bg: 'rgba(74,222,128,0.12)',  label: 'Excellent',  icon: CheckCircle2 },
-  B: { color: BLUE,   bg: 'rgba(96,165,250,0.12)',  label: 'Good',       icon: CheckCircle2 },
-  C: { color: ORANGE, bg: 'rgba(251,146,60,0.12)',  label: 'Fair',       icon: AlertTriangle },
-  D: { color: RED,    bg: 'rgba(248,113,113,0.12)', label: 'At Risk',    icon: AlertTriangle },
-  F: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', label: 'Critical', icon: XCircle },
+  A: { colorClass: 'text-emerald-500', bgClass: 'bg-emerald-500/15', label: 'Excellent', icon: CheckCircle2 },
+  B: { colorClass: 'text-blue-500',    bgClass: 'bg-blue-500/15',    label: 'Good',      icon: CheckCircle2 },
+  C: { colorClass: 'text-orange-500',  bgClass: 'bg-orange-500/15',  label: 'Fair',      icon: AlertTriangle },
+  D: { colorClass: 'text-red-500',     bgClass: 'bg-red-500/15',     label: 'At Risk',   icon: AlertTriangle },
+  F: { colorClass: 'text-red-600',     bgClass: 'bg-red-600/15',     label: 'Critical',  icon: XCircle },
 };
 
 function GradeBadge({ grade }) {
   const cfg = GRADE_CONFIG[grade] || GRADE_CONFIG.C;
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-      background: cfg.bg, color: cfg.color,
-    }}>
-      {grade} · {cfg.label}
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-bold ${cfg.bgClass} ${cfg.colorClass}`}>
+      {grade} &middot; {cfg.label}
     </span>
   );
 }
 
 function ScoreMini({ score }) {
-  const color = score >= 80 ? GREEN : score >= 65 ? BLUE : score >= 50 ? ORANGE : RED;
+  const colorClass = score >= 80 ? 'bg-emerald-500' : score >= 65 ? 'bg-blue-500' : score >= 50 ? 'bg-orange-500' : 'bg-red-500';
+  const textClass = score >= 80 ? 'text-emerald-500' : score >= 65 ? 'text-blue-500' : score >= 50 ? 'text-orange-500' : 'text-red-500';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ width: 80, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.08)' }}>
-        <div style={{ width: `${score}%`, height: '100%', borderRadius: 3, background: color }} />
+    <div className="flex items-center gap-2">
+      <div className="w-[80px] h-1.5 rounded bg-surface-secondary overflow-hidden">
+        <div className={`h-full rounded ${colorClass}`} style={{ width: `${score}%` }} />
       </div>
-      <span style={{ fontSize: 13, fontWeight: 700, color, minWidth: 30 }}>{score}</span>
+      <span className={`text-[13px] font-bold min-w-[30px] ${textClass}`}>{score}</span>
     </div>
   );
 }
 
 function ComponentRow({ label, component }) {
   if (!component) return null;
-  const color = component.score >= 70 ? GREEN : component.score >= 45 ? ORANGE : RED;
+  const colorClass = component.score >= 70 ? 'bg-emerald-500' : component.score >= 45 ? 'bg-orange-500' : 'bg-red-500';
+  const textClass = component.score >= 70 ? 'text-emerald-500' : component.score >= 45 ? 'text-orange-500' : 'text-red-500';
+  
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', borderBottom: `1px solid ${BORDER}` }}>
-      <span style={{ flex: 1, fontSize: 12, color: MUTED }}>{label}</span>
-      <div style={{ width: 60, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
-        <div style={{ width: `${component.score}%`, height: '100%', borderRadius: 2, background: color }} />
+    <div className="flex items-center gap-3 py-2 border-b border-border last:border-0">
+      <span className="flex-1 text-[12px] text-text-muted">{label}</span>
+      <div className="w-[60px] h-1.5 rounded-full bg-surface-secondary overflow-hidden">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${component.score}%` }} />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 600, color, width: 28, textAlign: 'right' }}>{component.score}</span>
-      <span style={{ fontSize: 11, color: MUTED, flex: 2, textAlign: 'right' }}>{component.signal}</span>
+      <span className={`text-[12px] font-bold w-7 text-right ${textClass}`}>{component.score}</span>
+      <span className="text-[11px] text-text-muted flex-[2] text-right">{component.signal}</span>
     </div>
   );
 }
@@ -73,31 +62,29 @@ function HealthRow({ doc, onView }) {
   return (
     <>
       <tr
-        style={{ cursor: 'pointer', transition: 'background 0.1s' }}
+        className="cursor-pointer transition-colors hover:bg-surface-secondary/40 border-b border-border last:border-0"
         onClick={() => setExpanded(v => !v)}
-        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
       >
-        <td style={{ padding: '12px 14px', color: TEXT, fontWeight: 600 }}>{tenant?.name || '—'}</td>
-        <td style={{ padding: '12px 14px' }}><GradeBadge grade={doc.grade} /></td>
-        <td style={{ padding: '12px 14px' }}><ScoreMini score={doc.score} /></td>
-        <td style={{ padding: '12px 14px', color: MUTED, fontSize: 12 }}>
+        <td className="px-4 py-3.5 text-[13px] font-bold text-text-primary">{tenant?.name || '—'}</td>
+        <td className="px-4 py-3.5"><GradeBadge grade={doc.grade} /></td>
+        <td className="px-4 py-3.5"><ScoreMini score={doc.score} /></td>
+        <td className="px-4 py-3.5 text-[12px] text-text-muted">
           {doc.computedAt ? new Date(doc.computedAt).toLocaleDateString('en-IN') : '—'}
         </td>
-        <td style={{ padding: '12px 14px' }}>
+        <td className="px-4 py-3.5 text-right">
           <button
             onClick={e => { e.stopPropagation(); onView(tenant?._id || doc.tenantId); }}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 7, border: `1px solid ${BORDER}`, background: 'transparent', color: MUTED, cursor: 'pointer', fontSize: 11 }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[12px] transition-colors"
           >
-            Detail <ExternalLink size={11} />
+            Detail <ExternalLink size={12} />
           </button>
         </td>
       </tr>
       {expanded && (
-        <tr>
-          <td colSpan={5} style={{ padding: '0 14px 14px', background: 'rgba(255,255,255,0.02)' }}>
-            <div style={{ paddingTop: 12 }}>
-              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: TEXT }}>Component Breakdown</p>
+        <tr className="border-b border-border">
+          <td colSpan={5} className="px-5 pb-5 pt-2 bg-surface-secondary/20">
+            <div>
+              <p className="m-0 mb-3 text-[12px] font-bold text-text-primary uppercase tracking-[0.05em]">Component Breakdown</p>
               <ComponentRow label="Payment Health (30%)"        component={comp.paymentHealth} />
               <ComponentRow label="Seat Utilization (20%)"      component={comp.seatUtilization} />
               <ComponentRow label="Plan Longevity (20%)"        component={comp.planLongevity} />
@@ -152,29 +139,30 @@ export default function HealthScoresPage() {
   }, {});
 
   return (
-    <AdminLayout>
-      <div style={{ color: TEXT }}>
+    <AdminLayout title="Health Scores">
+      <div className="font-sans text-text-primary max-w-[1200px]">
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-7">
           <div>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: TEXT, letterSpacing: '-0.02em' }}>
+            <h1 className="m-0 text-[26px] font-bold text-text-primary tracking-tight">
               Customer Health Scores
             </h1>
-            <p style={{ margin: '4px 0 0', fontSize: 14, color: MUTED }}>
+            <p className="m-0 mt-1.5 text-sm text-text-muted">
               Operational health snapshot per tenant — payment reliability, seat utilization, tenure
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div className="flex gap-2.5">
             <button
               onClick={triggerCompute}
               disabled={computing}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: '1px solid rgba(108,99,255,0.3)', background: 'rgba(108,99,255,0.08)', color: '#a78bfa', cursor: computing ? 'not-allowed' : 'pointer', fontSize: 13, opacity: computing ? 0.7 : 1 }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-primary/30 bg-primary/10 text-primary cursor-pointer text-[13px] font-semibold disabled:opacity-70 disabled:cursor-not-allowed hover:bg-primary/15 transition-colors"
             >
-              <Zap size={14} /> {computing ? 'Computing…' : 'Recompute All'}
+              {computing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />} 
+              {computing ? 'Computing…' : 'Recompute All'}
             </button>
             <button
               onClick={() => load()}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: `1px solid ${BORDER}`, background: CARD, color: MUTED, cursor: 'pointer', fontSize: 13 }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-surface text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors"
             >
               <RefreshCw size={14} /> {lastRefresh ? lastRefresh.toLocaleTimeString() : 'Refresh'}
             </button>
@@ -183,10 +171,12 @@ export default function HealthScoresPage() {
 
         {/* Grade distribution */}
         {!loading && data.length > 0 && (
-          <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
+          <div className="flex flex-wrap gap-2.5 mb-7">
             <button
               onClick={() => { setGradeFilter(''); load(''); }}
-              style={{ padding: '6px 14px', borderRadius: 20, border: `1px solid ${gradeFilter === '' ? ACCENT : BORDER}`, background: gradeFilter === '' ? 'rgba(108,99,255,0.15)' : 'transparent', color: gradeFilter === '' ? '#a78bfa' : MUTED, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+              className={`px-4 py-1.5 rounded-full border text-[12px] font-bold cursor-pointer transition-colors ${
+                gradeFilter === '' ? 'bg-primary/15 border-primary text-primary' : 'bg-transparent border-border text-text-muted hover:border-text-muted'
+              }`}
             >
               All ({data.length})
             </button>
@@ -195,7 +185,9 @@ export default function HealthScoresPage() {
               return (
                 <button key={g}
                   onClick={() => { setGradeFilter(g); load(g); }}
-                  style={{ padding: '6px 14px', borderRadius: 20, border: `1px solid ${gradeFilter === g ? cfg.color : BORDER}`, background: gradeFilter === g ? cfg.bg : 'transparent', color: gradeFilter === g ? cfg.color : MUTED, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                  className={`px-4 py-1.5 rounded-full border text-[12px] font-bold cursor-pointer transition-colors ${
+                    gradeFilter === g ? `${cfg.bgClass} border-current ${cfg.colorClass}` : 'bg-transparent border-border text-text-muted hover:border-text-muted'
+                  }`}
                 >
                   Grade {g} ({cnt})
                 </button>
@@ -206,43 +198,46 @@ export default function HealthScoresPage() {
 
         {/* Table */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 80 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', border: `3px solid ${ACCENT}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <p style={{ color: MUTED, margin: 0 }}>Loading health scores…</p>
+          <div className="py-20 text-center">
+            <Loader2 size={40} className="text-primary animate-spin mx-auto mb-4" />
+            <p className="text-text-muted m-0 text-sm">Loading health scores…</p>
           </div>
         ) : data.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 80, color: MUTED }}>
-            <Heart size={40} color={MUTED} style={{ margin: '0 auto 16px' }} />
-            <p style={{ margin: 0, fontSize: 15, color: TEXT }}>No health scores yet</p>
-            <p style={{ margin: '6px 0 16px', fontSize: 13 }}>Click "Recompute All" to generate health scores for all active tenants.</p>
+          <div className="py-20 text-center text-text-muted">
+            <Heart size={48} className="mx-auto mb-4 opacity-40 text-text-muted" />
+            <p className="m-0 text-[16px] font-bold text-text-primary mb-1.5">No health scores yet</p>
+            <p className="m-0 text-[13px] mb-5">Click "Recompute All" to generate health scores for all active tenants.</p>
             <button
               onClick={triggerCompute}
-              style={{ padding: '10px 24px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#6c63ff,#a78bfa)', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+              className="px-6 py-2.5 rounded-xl border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-[14px] font-semibold transition-colors"
             >
               Generate Health Scores
             </button>
           </div>
         ) : (
-          <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 16, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                  {['Tenant', 'Grade', 'Score', 'Computed', 'Actions'].map(h => (
-                    <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+          <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-surface-secondary/50 border-b border-border">
+                    {['Tenant', 'Grade', 'Score', 'Computed', 'Actions'].map(h => (
+                      <th key={h} className={`px-4 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.06em] ${h === 'Actions' ? 'text-right' : ''}`}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map(doc => (
+                    <HealthRow
+                      key={doc._id}
+                      doc={doc}
+                      onView={(id) => navigate(`/admin/tenants/${id}`)}
+                    />
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.map(doc => (
-                  <HealthRow
-                    key={doc._id}
-                    doc={doc}
-                    onView={(id) => navigate(`/admin/tenants/${id}`)}
-                  />
-                ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

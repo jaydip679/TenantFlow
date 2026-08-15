@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Receipt, Download, CreditCard } from 'lucide-react';
+import { Receipt, Download, CreditCard, Loader2 } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout.jsx';
 import RazorpayCheckout from '../../components/billing/RazorpayCheckout.jsx';
 import { getInvoices, getInvoicePdf } from '../../services/subscriptionService.js';
 import { formatCurrency, formatDate } from '../../utils/helpers.js';
 
 const STATUS_STYLES = {
-  paid:          { className: 'badge badge-success', label: 'Paid' },
-  open:          { className: 'badge badge-info',    label: 'Open' },
-  void:          { className: 'badge badge-neutral', label: 'Void' },
-  uncollectible: { className: 'badge badge-danger',  label: 'Uncollectible' },
+  paid:          { className: 'bg-success/10 text-success border border-success/20', label: 'Paid' },
+  open:          { className: 'bg-warning/10 text-warning border border-warning/20', label: 'Open' },
+  void:          { className: 'bg-surface-secondary text-text-muted border border-border', label: 'Void' },
+  uncollectible: { className: 'bg-danger/10 text-danger border border-danger/20', label: 'Uncollectible' },
 };
 
 export default function InvoicesPage() {
@@ -60,98 +60,128 @@ export default function InvoicesPage() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <DashboardLayout>
-      <div style={{ maxWidth: 1100 }}>
-        <div className="page-header">
+    <DashboardLayout title="Invoices">
+      <div className="max-w-[1100px] font-sans text-text-primary">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-7">
           <div>
-            <h1 className="page-title">
-              <Receipt size={22} style={{ display: 'inline', marginRight: 10, verticalAlign: 'middle' }} />
+            <h1 className="m-0 text-[26px] font-bold text-text-primary flex items-center gap-2.5 tracking-tight">
+              <div className="w-9 h-9 rounded-[10px] bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                <Receipt size={18} className="text-primary" />
+              </div>
               Invoices
             </h1>
-            <p className="page-subtitle">Download PDF invoices and pay outstanding balances</p>
+            <p className="m-0 mt-1.5 text-sm text-text-muted">Download PDF invoices and pay outstanding balances</p>
           </div>
         </div>
 
-        {error && <div className="alert alert-danger">{error}</div>}
+        {error && <div className="mb-6 p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm font-medium">{error}</div>}
 
-        <div className="table-container">
-          {loading ? (
-            <div style={{ padding: 48, textAlign: 'center' }}>
-              <div className="btn-spinner" style={{ width: 32, height: 32, borderWidth: 3, margin: '0 auto', borderTopColor: 'var(--color-primary)' }} />
-            </div>
-          ) : invoices.length === 0 ? (
-            <div className="empty-state">
-              <Receipt size={40} className="empty-state-icon" />
-              <h3>No invoices yet</h3>
-              <p>Your invoices will appear here once billing begins.</p>
-            </div>
-          ) : (
-            <table className="data-table">
+        <div className="bg-surface border border-border rounded-2xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr>
-                  <th>Invoice #</th>
-                  <th>Date</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                <tr className="bg-surface-secondary/50 border-b border-border">
+                  {['Invoice #', 'Date', 'Amount', 'Status', 'Actions'].map((h) => (
+                    <th key={h} className="px-4 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {invoices.map((inv) => {
-                  const badge = STATUS_STYLES[inv.status] || STATUS_STYLES.void;
-                  return (
-                    <tr key={inv._id}>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--color-primary)' }}>
-                        {inv.invoiceNumber}
-                      </td>
-                      <td>{formatDate(inv.issuedAt || inv.createdAt)}</td>
-                      <td style={{ fontWeight: 600 }}>{formatCurrency(inv.total)}</td>
-                      <td><span className={badge.className}>{badge.label}</span></td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <button
-                            className="btn-ghost btn-sm"
-                            onClick={() => handleDownloadPdf(inv._id)}
-                            title="Download PDF"
-                          >
-                            <Download size={14} /> PDF
-                          </button>
-
-                          {inv.status === 'open' && (
-                            payingId === inv._id ? (
-                              <RazorpayCheckout
-                                invoiceId={inv._id}
-                                amount={inv.total}
-                                tenantName={user?.tenantName || user?.name}
-                                onSuccess={handlePaySuccess}
-                                onFailure={() => setPayingId(null)}
-                              />
-                            ) : (
-                              <button
-                                className="btn-primary btn-sm"
-                                onClick={() => setPayingId(inv._id)}
-                              >
-                                <CreditCard size={14} /> Pay Now
-                              </button>
-                            )
-                          )}
-                        </div>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="border-b border-border last:border-0">
+                      <td colSpan={5} className="p-0">
+                        <div className="h-14 bg-surface-secondary/40 animate-pulse my-0.5" />
                       </td>
                     </tr>
-                  );
-                })}
+                  ))
+                ) : invoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-16 text-text-muted">
+                      <Receipt size={48} className="mx-auto mb-3 text-text-muted/40" />
+                      <h3 className="text-base font-bold text-text-primary m-0 mb-1">No invoices yet</h3>
+                      <p className="text-sm m-0">Your invoices will appear here once billing begins.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  invoices.map((inv) => {
+                    const badge = STATUS_STYLES[inv.status] || STATUS_STYLES.void;
+                    return (
+                      <tr key={inv._id} className="border-b border-border transition-colors hover:bg-surface-secondary/30 last:border-0">
+                        <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-[13px] text-primary">
+                          {inv.invoiceNumber}
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-[13px]">
+                          {formatDate(inv.issuedAt || inv.createdAt)}
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-[13px] font-semibold">
+                          {formatCurrency(inv.total)}
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${badge.className}`}>
+                            {badge.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <div className="flex gap-2 items-center">
+                            <button
+                              className="px-3 py-1.5 rounded-lg border border-transparent bg-transparent text-text-muted hover:text-text-primary hover:bg-surface-secondary cursor-pointer text-xs font-semibold transition-colors flex items-center gap-1.5"
+                              onClick={() => handleDownloadPdf(inv._id)}
+                              title="Download PDF"
+                            >
+                              <Download size={14} /> PDF
+                            </button>
+
+                            {inv.status === 'open' && (
+                              payingId === inv._id ? (
+                                <RazorpayCheckout
+                                  invoiceId={inv._id}
+                                  amount={inv.total}
+                                  tenantName={user?.tenantName || user?.name}
+                                  onSuccess={handlePaySuccess}
+                                  onFailure={() => setPayingId(null)}
+                                />
+                              ) : (
+                                <button
+                                  className="px-3 py-1.5 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-xs font-semibold transition-colors flex items-center gap-1.5"
+                                  onClick={() => setPayingId(inv._id)}
+                                >
+                                  <CreditCard size={14} /> Pay Now
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
-          )}
+          </div>
 
           {totalPages > 1 && (
-            <div className="pagination">
-              <span className="pagination-info">
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-surface-secondary/30">
+              <span className="text-[13px] text-text-muted font-medium">
                 Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
               </span>
-              <div className="pagination-controls">
-                <button className="btn-ghost btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
-                <button className="btn-ghost btn-sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+              <div className="flex gap-2">
+                <button 
+                  className="px-3 py-1.5 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                  disabled={page === 1} 
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  &larr; Prev
+                </button>
+                <button 
+                  className="px-3 py-1.5 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                  disabled={page >= totalPages} 
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  Next &rarr;
+                </button>
               </div>
             </div>
           )}

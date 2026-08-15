@@ -9,7 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import AdminLayout from '../../components/layout/AdminLayout.jsx';
 import { getAdminTenants, updateTenantStatus } from '../../services/adminService.js';
@@ -20,173 +20,40 @@ function formatINR(paise) {
   return '₹' + Math.round(paise / 100).toLocaleString('en-IN');
 }
 
-function statusColor(status) {
+function statusBadge(status) {
   switch (status) {
-    case 'active':    return { bg: 'rgba(34,197,94,0.12)',  color: '#4ade80', border: 'rgba(34,197,94,0.25)'  };
-    case 'trialing':  return { bg: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: 'rgba(59,130,246,0.25)' };
-    case 'suspended': return { bg: 'rgba(239,68,68,0.12)',  color: '#f87171', border: 'rgba(239,68,68,0.25)'  };
-    case 'cancelled': return { bg: 'rgba(107,114,128,0.12)',color: '#9ca3af', border: 'rgba(107,114,128,0.25)' };
-    default:          return { bg: 'rgba(107,114,128,0.1)', color: '#9ca3af', border: 'rgba(107,114,128,0.2)'  };
+    case 'active':    return 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30';
+    case 'trialing':  return 'bg-blue-500/15 text-blue-500 border-blue-500/30';
+    case 'suspended': return 'bg-red-500/15 text-red-500 border-red-500/30';
+    case 'cancelled': return 'bg-text-muted/15 text-text-muted border-text-muted/30';
+    default:          return 'bg-text-muted/15 text-text-muted border-text-muted/30';
   }
 }
 
-function riskColor(score) {
-  if (score > 75) return '#ef4444';
-  if (score > 40) return '#f97316';
-  return '#22c55e';
+function riskColorClass(score) {
+  if (score > 75) return 'text-red-500';
+  if (score > 40) return 'text-orange-500';
+  return 'text-emerald-500';
+}
+function riskBgClass(score) {
+  if (score > 75) return 'bg-red-500';
+  if (score > 40) return 'bg-orange-500';
+  return 'bg-emerald-500';
 }
 
 // ── Churn bar ─────────────────────────────────────────────────────────────────
 function ChurnBar({ score }) {
-  const color = riskColor(score ?? 0);
+  const colorClass = riskColorClass(score ?? 0);
+  const bgClass = riskBgClass(score ?? 0);
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ width: `${score ?? 0}%`, height: '100%', background: color, borderRadius: 3, transition: 'width 0.3s ease' }} />
+    <div className="flex items-center gap-2 w-full max-w-[120px]">
+      <div className="flex-1 h-1.5 bg-surface-secondary rounded overflow-hidden">
+        <div className={`h-full rounded transition-all duration-300 ease-out ${bgClass}`} style={{ width: `${score ?? 0}%` }} />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 600, color, minWidth: 28, textAlign: 'right' }}>{score ?? 0}</span>
+      <span className={`text-[12px] font-bold min-w-[28px] text-right ${colorClass}`}>{score ?? 0}</span>
     </div>
   );
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-const S = {
-  page: { color: '#f0f0ff', fontFamily: 'system-ui, sans-serif' },
-  headerRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
-  pageTitle: { margin: 0, fontSize: 24, fontWeight: 700, color: '#f0f0ff', letterSpacing: '-0.02em' },
-  pageSub: { margin: '4px 0 0', fontSize: 14, color: '#8b8bad' },
-  filtersRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-    flexWrap: 'wrap',
-  },
-  filterSelect: {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 9,
-    color: '#f0f0ff',
-    padding: '8px 12px',
-    fontSize: 13,
-    cursor: 'pointer',
-    outline: 'none',
-    minWidth: 140,
-  },
-  searchWrap: { position: 'relative', flex: 1, maxWidth: 320 },
-  searchIcon: { position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#8b8bad' },
-  searchInput: {
-    width: '100%',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 9,
-    color: '#f0f0ff',
-    padding: '8px 12px 8px 34px',
-    fontSize: 13,
-    outline: 'none',
-    boxSizing: 'border-box',
-  },
-  tableWrap: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: {
-    padding: '12px 16px',
-    textAlign: 'left',
-    fontSize: 11,
-    fontWeight: 600,
-    color: '#8b8bad',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    background: 'rgba(255,255,255,0.02)',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-  },
-  td: {
-    padding: '13px 16px',
-    fontSize: 13,
-    color: '#f0f0ff',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
-    verticalAlign: 'middle',
-  },
-  statusBadge: (status) => {
-    const c = statusColor(status);
-    return {
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '3px 10px',
-      borderRadius: 20,
-      fontSize: 11,
-      fontWeight: 600,
-      background: c.bg,
-      color: c.color,
-      border: `1px solid ${c.border}`,
-      textTransform: 'capitalize',
-    };
-  },
-  btnView: {
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(255,255,255,0.04)', color: '#a78bfa', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-  },
-  btnSuspend: {
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    padding: '5px 10px', borderRadius: 7, border: '1px solid rgba(239,68,68,0.25)',
-    background: 'rgba(239,68,68,0.08)', color: '#f87171', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-    marginLeft: 6,
-  },
-  pagination: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', justifyContent: 'flex-end' },
-  pageBtn: (disabled) => ({
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, borderRadius: 8,
-    background: disabled ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    color: disabled ? '#4b5563' : '#f0f0ff',
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    fontSize: 13,
-  }),
-  pageInfo: { fontSize: 13, color: '#8b8bad' },
-  emptyRow: { textAlign: 'center', padding: '40px 0', color: '#8b8bad', fontSize: 14 },
-  skeletonRow: { height: 56, background: 'rgba(255,255,255,0.03)', animation: 'tf-pulse 1.5s ease-in-out infinite' },
-  // Modal
-  overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
-    backdropFilter: 'blur(4px)', zIndex: 1000,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  modal: {
-    background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 16, padding: 28, width: 420, maxWidth: '90vw',
-  },
-  modalTitle: { margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: '#f0f0ff' },
-  modalSub: { margin: '0 0 20px', fontSize: 13, color: '#8b8bad' },
-  label: { display: 'block', fontSize: 12, fontWeight: 600, color: '#8b8bad', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' },
-  select: {
-    width: '100%', background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9,
-    color: '#f0f0ff', padding: '9px 12px', fontSize: 13,
-    outline: 'none', marginBottom: 14, boxSizing: 'border-box',
-  },
-  textarea: {
-    width: '100%', background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9,
-    color: '#f0f0ff', padding: '9px 12px', fontSize: 13,
-    outline: 'none', resize: 'vertical', minHeight: 80,
-    fontFamily: 'system-ui, sans-serif', boxSizing: 'border-box',
-  },
-  modalBtns: { display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' },
-  btnCancel: {
-    padding: '9px 18px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(255,255,255,0.04)', color: '#8b8bad', cursor: 'pointer', fontSize: 13,
-  },
-  btnConfirm: {
-    padding: '9px 18px', borderRadius: 9, border: 'none',
-    background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-  },
-  errText: { fontSize: 12, color: '#f87171', marginTop: 4 },
-};
 
 const PAGE_SIZE = 10;
 
@@ -211,38 +78,43 @@ function SuspendModal({ tenant, onClose, onSuccess }) {
   };
 
   return (
-    <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={S.modal}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-surface border border-border rounded-2xl p-7 w-full max-w-[420px] shadow-xl">
+        <div className="flex justify-between items-start mb-5">
           <div>
-            <p style={S.modalTitle}>Change Tenant Status</p>
-            <p style={S.modalSub}>Updating: <strong style={{ color: '#a78bfa' }}>{tenant.name}</strong></p>
+            <p className="m-0 mb-1 text-[18px] font-bold text-text-primary">Change Tenant Status</p>
+            <p className="m-0 text-[13px] text-text-muted">Updating: <strong className="text-primary">{tenant.name}</strong></p>
           </div>
-          <button style={{ background: 'none', border: 'none', color: '#8b8bad', cursor: 'pointer' }} onClick={onClose}><X size={18} /></button>
+          <button className="bg-transparent border-none text-text-muted hover:text-text-primary cursor-pointer p-1" onClick={onClose}><X size={18} /></button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <label style={S.label}>New Status</label>
-          <select style={S.select} {...register('status', { required: 'Status is required' })}>
-            <option value="suspended">Suspended</option>
-            <option value="active">Active</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          {errors.status && <p style={S.errText}>{errors.status.message}</p>}
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <div>
+            <label className="block text-[12px] font-semibold text-text-muted mb-1.5 uppercase tracking-[0.05em]">New Status</label>
+            <select className="w-full bg-surface-secondary/50 border border-border rounded-xl px-3.5 py-2.5 text-text-primary text-[13px] outline-none focus:border-primary transition-colors cursor-pointer" {...register('status', { required: 'Status is required' })}>
+              <option value="suspended">Suspended</option>
+              <option value="active">Active</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            {errors.status && <p className="m-0 mt-1 text-[12px] text-danger font-medium">{errors.status.message}</p>}
+          </div>
 
-          <label style={S.label}>Reason</label>
-          <textarea
-            style={S.textarea}
-            placeholder="Provide a reason for this status change…"
-            {...register('reason', { required: 'Reason is required' })}
-          />
-          {errors.reason && <p style={S.errText}>{errors.reason.message}</p>}
-          {error && <p style={S.errText}>{error}</p>}
+          <div>
+            <label className="block text-[12px] font-semibold text-text-muted mb-1.5 uppercase tracking-[0.05em]">Reason</label>
+            <textarea
+              className="w-full bg-surface-secondary/50 border border-border rounded-xl px-3.5 py-2.5 text-text-primary text-[13px] outline-none focus:border-primary transition-colors resize-y min-h-[80px]"
+              placeholder="Provide a reason for this status change…"
+              {...register('reason', { required: 'Reason is required' })}
+            />
+            {errors.reason && <p className="m-0 mt-1 text-[12px] text-danger font-medium">{errors.reason.message}</p>}
+          </div>
+          
+          {error && <p className="m-0 text-[13px] text-danger font-medium">{error}</p>}
 
-          <div style={S.modalBtns}>
-            <button type="button" style={S.btnCancel} onClick={onClose}>Cancel</button>
-            <button type="submit" style={S.btnConfirm} disabled={loading}>
-              {loading ? 'Updating…' : 'Confirm Change'}
+          <div className="flex justify-end gap-3 mt-2">
+            <button type="button" className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors" onClick={onClose}>Cancel</button>
+            <button type="submit" className="px-4 py-2 rounded-lg border-none bg-danger hover:bg-red-600 text-white cursor-pointer text-[13px] font-bold min-w-[120px] flex items-center justify-center transition-colors disabled:opacity-70 disabled:cursor-not-allowed" disabled={loading}>
+              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Confirm Change'}
             </button>
           </div>
         </form>
@@ -293,51 +165,38 @@ export default function TenantsPage() {
     setTenants((prev) => prev.map((t) => t._id === tenantId ? { ...t, status: newStatus } : t));
   };
 
-  // Inject keyframes
-  useEffect(() => {
-    const id = 'tf-tenants-kf';
-    if (!document.getElementById(id)) {
-      const el = document.createElement('style');
-      el.id = id;
-      el.textContent = `@keyframes tf-pulse{0%,100%{opacity:1}50%{opacity:0.4}}`;
-      document.head.appendChild(el);
-    }
-  }, []);
-
   return (
     <AdminLayout title="Tenants">
-      <div style={S.page}>
-        <div style={S.headerRow}>
-          <div>
-            <h1 style={S.pageTitle}>Tenants</h1>
-            <p style={S.pageSub}>Manage all platform tenants</p>
-          </div>
+      <div className="font-sans text-text-primary">
+        <div className="mb-7">
+          <h1 className="m-0 text-[26px] font-bold text-text-primary tracking-tight">Tenants</h1>
+          <p className="m-0 mt-1.5 text-sm text-text-muted">Manage all platform tenants</p>
         </div>
 
         {error && (
-          <div style={{ marginBottom: 16, padding: '10px 16px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', fontSize: 13 }}>
+          <div className="mb-6 p-4 rounded-xl bg-danger/10 border border-danger/20 text-danger text-[13px] font-medium">
             {error}
           </div>
         )}
 
         {/* Filters */}
-        <div style={S.filtersRow}>
-          <div style={S.searchWrap}>
-            <Search size={14} style={S.searchIcon} />
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <div className="relative flex-1 max-w-[320px] min-w-[200px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
-              style={S.searchInput}
+              className="w-full bg-surface border border-border rounded-xl pl-9 pr-3.5 py-2 text-[13px] text-text-primary outline-none focus:border-primary transition-colors"
               placeholder="Search tenants…"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Filter size={14} color="#8b8bad" />
+          <div className="flex items-center gap-2 px-2 hidden sm:flex">
+            <Filter size={14} className="text-text-muted" />
           </div>
 
           <select
-            style={S.filterSelect}
+            className="bg-surface border border-border rounded-xl px-3.5 py-2 text-[13px] text-text-primary outline-none focus:border-primary transition-colors cursor-pointer min-w-[140px]"
             value={statusFilter}
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
           >
@@ -349,7 +208,7 @@ export default function TenantsPage() {
           </select>
 
           <select
-            style={S.filterSelect}
+            className="bg-surface border border-border rounded-xl px-3.5 py-2 text-[13px] text-text-primary outline-none focus:border-primary transition-colors cursor-pointer min-w-[140px]"
             value={riskFilter}
             onChange={(e) => { setRisk(e.target.value); setPage(1); }}
           >
@@ -361,94 +220,98 @@ export default function TenantsPage() {
         </div>
 
         {/* Table */}
-        <div style={S.tableWrap}>
-          <table style={S.table}>
-            <thead>
-              <tr>
-                {['Tenant Name', 'Status', 'Plan', 'MRR', 'Seats', 'Churn Risk', 'Actions'].map((h) => (
-                  <th key={h} style={S.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={7} style={{ padding: 0 }}>
-                      <div style={{ ...S.skeletonRow, margin: '2px 0' }} />
-                    </td>
-                  </tr>
-                ))
-              ) : tenants.length === 0 ? (
-                <tr><td colSpan={7} style={S.emptyRow}>No tenants found</td></tr>
-              ) : (
-                tenants.map((tenant) => (
-                  <tr key={tenant._id} style={{ cursor: 'pointer' }}>
-                    <td style={S.td}>
-                      <div>
-                        <div style={{ fontWeight: 600, color: '#f0f0ff' }}>{tenant.name}</div>
-                        <div style={{ fontSize: 11, color: '#8b8bad', marginTop: 2 }}>{tenant.slug}</div>
-                      </div>
-                    </td>
-                    <td style={S.td}>
-                      <span style={S.statusBadge(tenant.status)}>{tenant.status}</span>
-                    </td>
-                    <td style={{ ...S.td, color: '#a78bfa' }}>
-                      {tenant.planName ?? tenant.plan?.name ?? '—'}
-                    </td>
-                    <td style={{ ...S.td, color: '#4ade80', fontWeight: 600 }}>
-                      {formatINR(tenant.mrrContribution ?? tenant.mrr)}
-                    </td>
-                    <td style={S.td}>
-                      <span style={{ color: '#60a5fa' }}>
+        <div className="bg-surface border border-border rounded-2xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-surface-secondary/50 border-b border-border">
+                  {['Tenant Name', 'Status', 'Plan', 'MRR', 'Seats', 'Churn Risk', 'Actions'].map((h) => (
+                    <th key={h} className="px-4 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="border-b border-border last:border-0">
+                      <td colSpan={7} className="p-0">
+                        <div className="h-14 bg-surface-secondary/40 animate-pulse my-0.5" />
+                      </td>
+                    </tr>
+                  ))
+                ) : tenants.length === 0 ? (
+                  <tr><td colSpan={7} className="text-center py-12 text-text-muted text-[14px]">No tenants found</td></tr>
+                ) : (
+                  tenants.map((tenant) => (
+                    <tr key={tenant._id} className="border-b border-border transition-colors hover:bg-surface-secondary/30 last:border-0 cursor-pointer" onClick={() => navigate(`/admin/tenants/${tenant._id}`)}>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <div className="font-bold text-text-primary text-[13px]">{tenant.name}</div>
+                        <div className="text-[11px] text-text-muted mt-0.5">{tenant.slug}</div>
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border uppercase tracking-[0.05em] ${statusBadge(tenant.status)}`}>
+                          {tenant.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-[13px] font-medium text-primary whitespace-nowrap">
+                        {tenant.planName ?? tenant.plan?.name ?? '—'}
+                      </td>
+                      <td className="px-4 py-3.5 text-[13px] font-bold text-emerald-500 whitespace-nowrap">
+                        {formatINR(tenant.mrrContribution ?? tenant.mrr)}
+                      </td>
+                      <td className="px-4 py-3.5 text-[13px] font-medium text-blue-500 whitespace-nowrap">
                         {tenant.usedSeats ?? '—'}/{tenant.totalSeats ?? tenant.seats ?? '—'}
-                      </span>
-                    </td>
-                    <td style={{ ...S.td, minWidth: 140 }}>
-                      <ChurnBar score={tenant.churnRiskScore ?? tenant.churnScore} />
-                    </td>
-                    <td style={S.td}>
-                      <button
-                        style={S.btnView}
-                        onClick={() => navigate(`/admin/tenants/${tenant._id}`)}
-                      >
-                        <Eye size={13} />
-                        View
-                      </button>
-                      <button
-                        style={S.btnSuspend}
-                        onClick={() => setSuspend(tenant)}
-                      >
-                        <Ban size={13} />
-                        Suspend
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-4 py-3.5 min-w-[140px] whitespace-nowrap">
+                        <ChurnBar score={tenant.churnRiskScore ?? tenant.churnScore} />
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                        <div className="flex gap-2">
+                          <button
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border bg-transparent text-primary hover:bg-primary/5 cursor-pointer text-[12px] font-semibold transition-colors"
+                            onClick={() => navigate(`/admin/tenants/${tenant._id}`)}
+                          >
+                            <Eye size={13} /> View
+                          </button>
+                          <button
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-danger/20 bg-danger/5 text-danger hover:bg-danger/10 cursor-pointer text-[12px] font-semibold transition-colors"
+                            onClick={() => setSuspend(tenant)}
+                          >
+                            <Ban size={13} /> Suspend
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
           {/* Pagination */}
           {!loading && (
-            <div style={S.pagination}>
-              <span style={S.pageInfo}>
+            <div className="px-4 py-3 border-t border-border flex items-center justify-between bg-surface-secondary/20">
+              <span className="text-[13px] text-text-muted font-medium">
                 Page {page} of {totalPages} ({total} total)
               </span>
-              <button
-                style={S.pageBtn(page <= 1)}
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                style={S.pageBtn(page >= totalPages)}
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight size={16} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  className="w-8 h-8 rounded-lg border border-border bg-surface-secondary flex items-center justify-center text-text-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-border transition-colors"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  className="w-8 h-8 rounded-lg border border-border bg-surface-secondary flex items-center justify-center text-text-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-border transition-colors"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           )}
         </div>

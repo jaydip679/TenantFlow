@@ -7,7 +7,6 @@ import {
   Users,
   AlertTriangle,
   Activity,
-  RefreshCw,
   CheckCircle,
   XCircle,
   Zap,
@@ -52,116 +51,21 @@ function timeAgo(ts) {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
-const S = {
-  page: { color: '#f0f0ff', fontFamily: 'system-ui, sans-serif' },
-  header: { marginBottom: 28 },
-  pageTitle: { margin: 0, fontSize: 26, fontWeight: 700, color: '#f0f0ff', letterSpacing: '-0.02em' },
-  pageSubtitle: { margin: '4px 0 0', fontSize: 14, color: '#8b8bad' },
-  grid5: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: 16,
-    marginBottom: 24,
-  },
-  card: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 14,
-    padding: '20px 22px',
-    backdropFilter: 'blur(10px)',
-  },
-  cardIconRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  cardLabel: { margin: 0, fontSize: 12, fontWeight: 500, color: '#8b8bad', textTransform: 'uppercase', letterSpacing: '0.06em' },
-  cardValue: { margin: '6px 0 0', fontSize: 26, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em' },
-  iconBox: (color) => ({
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    background: `${color}20`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  }),
-  row2: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 24 },
-  chartCard: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 14,
-    padding: '22px 24px',
-  },
-  chartTitle: { margin: '0 0 18px', fontSize: 15, fontWeight: 600, color: '#f0f0ff' },
-  statRow: { display: 'flex', flexDirection: 'column', gap: 16 },
-  statCard: (color) => ({
-    background: `${color}10`,
-    border: `1px solid ${color}25`,
-    borderRadius: 12,
-    padding: '18px 20px',
-    flex: 1,
-  }),
-  statLabel: { margin: 0, fontSize: 12, color: '#8b8bad', fontWeight: 500 },
-  statValue: (color) => ({ margin: '6px 0 0', fontSize: 28, fontWeight: 700, color }),
-  livePanel: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 14,
-    padding: '22px 24px',
-    marginTop: 0,
-  },
-  liveTitleRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 },
-  liveTitle: { margin: 0, fontSize: 15, fontWeight: 600, color: '#f0f0ff' },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-    background: '#22c55e',
-    boxShadow: '0 0 6px #22c55e',
-    animation: 'tf-pulse 1.5s ease-in-out infinite',
-  },
-  eventList: { display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' },
-  eventItem: (success) => ({
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 10,
-    padding: '10px 12px',
-    borderRadius: 9,
-    background: success ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)',
-    border: `1px solid ${success ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`,
-  }),
-  eventMeta: { flex: 1, minWidth: 0 },
-  eventType: (success) => ({ margin: 0, fontSize: 13, fontWeight: 600, color: success ? '#4ade80' : '#f87171' }),
-  eventDesc: { margin: '2px 0 0', fontSize: 12, color: '#8b8bad', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  eventTime: { fontSize: 11, color: '#8b8bad', flexShrink: 0 },
-  skeleton: {
-    background: 'rgba(255,255,255,0.06)',
-    borderRadius: 10,
-    animation: 'tf-pulse 1.5s ease-in-out infinite',
-  },
-  skeletonCard: {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    borderRadius: 14,
-    padding: '20px 22px',
-    height: 100,
-    animation: 'tf-pulse 1.5s ease-in-out infinite',
-  },
-  emptyEvent: { textAlign: 'center', padding: '24px 0', color: '#8b8bad', fontSize: 13 },
-};
-
+// ── Components ─────────────────────────────────────────────────────────────────
 const METRIC_CARDS = [
-  { key: 'mrr',               label: 'MRR',                    color: '#22c55e', icon: TrendingUp,    fmt: formatINR    },
-  { key: 'arr',               label: 'ARR',                    color: '#3b82f6', icon: BarChart2,     fmt: formatINR    },
-  { key: 'activeSubscriptions', label: 'Active Subscriptions', color: '#14b8a6', icon: Users,         fmt: (v) => v ?? 0 },
-  { key: 'churnRate',         label: 'Churn Rate (Month)',     color: '#f97316', icon: Activity,      fmt: formatPercent },
-  { key: 'highRiskTenants',   label: 'High Risk Tenants',      color: '#ef4444', icon: AlertTriangle, fmt: (v) => v ?? 0 },
+  { key: 'mrr',               label: 'MRR',                    accentColor: '#22c55e', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/20', icon: TrendingUp,    fmt: formatINR    },
+  { key: 'arr',               label: 'ARR',                    accentColor: '#3b82f6', bgClass: 'bg-blue-500/10',    borderClass: 'border-blue-500/20',    icon: BarChart2,     fmt: formatINR    },
+  { key: 'activeSubscriptions', label: 'Active Subscriptions', accentColor: '#14b8a6', bgClass: 'bg-teal-500/10',    borderClass: 'border-teal-500/20',    icon: Users,         fmt: (v) => v ?? 0 },
+  { key: 'churnRate',         label: 'Churn Rate (Month)',     accentColor: '#f97316', bgClass: 'bg-orange-500/10',  borderClass: 'border-orange-500/20',  icon: Activity,      fmt: formatPercent },
+  { key: 'highRiskTenants',   label: 'High Risk Tenants',      accentColor: '#ef4444', bgClass: 'bg-red-500/10',     borderClass: 'border-red-500/20',     icon: AlertTriangle, fmt: (v) => v ?? 0 },
 ];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 14px' }}>
-      <p style={{ margin: 0, fontSize: 12, color: '#8b8bad' }}>{label}</p>
-      <p style={{ margin: '4px 0 0', fontSize: 14, fontWeight: 600, color: '#22c55e' }}>
+    <div className="bg-surface border border-border rounded-lg px-3.5 py-2.5 shadow-md">
+      <p className="m-0 text-xs text-text-muted">{label}</p>
+      <p className="m-0 mt-1 text-sm font-semibold text-emerald-500">
         ₹{Number(payload[0].value).toLocaleString('en-IN')}
       </p>
     </div>
@@ -174,17 +78,6 @@ export default function AdminDashboardPage() {
   const [events, setEvents]     = useState([]);
   const accessToken             = useSelector((s) => s.auth.accessToken);
   const socketRef               = useRef(null);
-
-  // Inject keyframes
-  useEffect(() => {
-    const id = 'tf-admin-dash-kf';
-    if (!document.getElementById(id)) {
-      const style = document.createElement('style');
-      style.id = id;
-      style.textContent = `@keyframes tf-pulse{0%,100%{opacity:1}50%{opacity:0.4}}`;
-      document.head.appendChild(style);
-    }
-  }, []);
 
   // Fetch metrics
   useEffect(() => {
@@ -244,103 +137,108 @@ export default function AdminDashboardPage() {
 
   return (
     <AdminLayout title="Dashboard">
-      <div style={S.page}>
+      <div className="font-sans text-text-primary">
         {/* Page header */}
-        <div style={S.header}>
-          <h1 style={S.pageTitle}>Platform Overview</h1>
-          <p style={S.pageSubtitle}>Real-time metrics and revenue intelligence</p>
+        <div className="mb-7">
+          <h1 className="m-0 text-[26px] font-bold text-text-primary tracking-tight">Platform Overview</h1>
+          <p className="m-0 mt-1 text-sm text-text-muted">Real-time metrics and revenue intelligence</p>
         </div>
 
         {/* Metric cards */}
         {loading ? (
-          <div style={S.grid5}>
-            {METRIC_CARDS.map((c) => <div key={c.key} style={S.skeletonCard} />)}
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4 mb-6">
+            {METRIC_CARDS.map((c) => (
+              <div key={c.key} className="bg-surface border border-border rounded-2xl p-5 h-[100px] animate-pulse" />
+            ))}
           </div>
         ) : (
-          <div style={S.grid5}>
-            {METRIC_CARDS.map(({ key, label, color, icon: Icon, fmt }) => (
-              <div key={key} style={S.card}>
-                <div style={S.cardIconRow}>
-                  <div style={S.iconBox(color)}>
-                    <Icon size={18} color={color} />
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4 mb-6">
+            {METRIC_CARDS.map(({ key, label, accentColor, bgClass, borderClass, icon: Icon, fmt }) => (
+              <div key={key} className="bg-surface border border-border rounded-2xl p-5 shadow-sm transition-colors hover:border-border/80">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center border ${bgClass} ${borderClass}`}>
+                    <Icon size={18} color={accentColor} />
                   </div>
                 </div>
-                <p style={S.cardLabel}>{label}</p>
-                <p style={{ ...S.cardValue, color }}>{fmt(metrics?.[key])}</p>
+                <p className="m-0 text-[12px] font-medium text-text-muted uppercase tracking-[0.06em]">{label}</p>
+                <p className="m-0 mt-1.5 text-[26px] font-bold leading-none tracking-tight" style={{ color: accentColor }}>
+                  {fmt(metrics?.[key])}
+                </p>
               </div>
             ))}
           </div>
         )}
 
         {/* Chart + stat cards */}
-        <div style={S.row2}>
+        <div className="grid lg:grid-cols-[2fr_1fr] gap-5 mb-6">
           {/* MRR Trend Chart */}
-          <div style={S.chartCard}>
-            <p style={S.chartTitle}>MRR Trend — Last 12 Months</p>
+          <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
+            <p className="m-0 mb-4.5 text-[15px] font-semibold text-text-primary">MRR Trend — Last 12 Months</p>
             {loading ? (
-              <div style={{ ...S.skeleton, height: 220 }} />
+              <div className="bg-surface-secondary rounded-xl h-[220px] animate-pulse" />
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={mrrTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="month" tick={{ fill: '#8b8bad', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#8b8bad', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line
-                    type="monotone"
-                    dataKey="mrr"
-                    stroke="#22c55e"
-                    strokeWidth={2.5}
-                    dot={false}
-                    activeDot={{ r: 5, fill: '#22c55e' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <div className="h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={mrrTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-border opacity-50" />
+                    <XAxis dataKey="month" tick={{ fill: 'var(--color-text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: 'var(--color-text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Line
+                      type="monotone"
+                      dataKey="mrr"
+                      stroke="#22c55e"
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 5, fill: '#22c55e' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
 
           {/* Stat cards */}
-          <div style={S.statRow}>
-            <div style={S.statCard('#22c55e')}>
-              <p style={S.statLabel}>New This Month</p>
+          <div className="flex flex-col gap-4">
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-5 py-4.5 flex-1 shadow-sm">
+              <p className="m-0 text-[12px] font-medium text-text-muted">New This Month</p>
               {loading
-                ? <div style={{ ...S.skeleton, height: 32, width: 60, marginTop: 8 }} />
-                : <p style={S.statValue('#4ade80')}>{metrics?.newThisMonth ?? metrics?.newSubscriptionsThisMonth ?? 0}</p>
+                ? <div className="bg-emerald-500/20 rounded-md h-8 w-16 mt-2 animate-pulse" />
+                : <p className="m-0 mt-1.5 text-[28px] font-bold text-emerald-400">{metrics?.newThisMonth ?? metrics?.newSubscriptionsThisMonth ?? 0}</p>
               }
             </div>
-            <div style={S.statCard('#ef4444')}>
-              <p style={S.statLabel}>Cancelled This Month</p>
+            <div className="bg-red-500/5 border border-red-500/20 rounded-xl px-5 py-4.5 flex-1 shadow-sm">
+              <p className="m-0 text-[12px] font-medium text-text-muted">Cancelled This Month</p>
               {loading
-                ? <div style={{ ...S.skeleton, height: 32, width: 60, marginTop: 8 }} />
-                : <p style={S.statValue('#f87171')}>{metrics?.cancelledThisMonth ?? metrics?.cancelledSubscriptionsThisMonth ?? 0}</p>
+                ? <div className="bg-red-500/20 rounded-md h-8 w-16 mt-2 animate-pulse" />
+                : <p className="m-0 mt-1.5 text-[28px] font-bold text-red-400">{metrics?.cancelledThisMonth ?? metrics?.cancelledSubscriptionsThisMonth ?? 0}</p>
               }
             </div>
           </div>
         </div>
 
         {/* Live events feed */}
-        <div style={S.livePanel}>
-          <div style={S.liveTitleRow}>
-            <div style={S.liveDot} />
-            <p style={S.liveTitle}>Live Platform Events</p>
-            <Zap size={14} color="#f59e0b" style={{ marginLeft: 2 }} />
+        <div className="bg-surface border border-border rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-2 h-2 rounded-full bg-success shadow-[0_0_6px_var(--color-success)] animate-pulse" />
+            <p className="m-0 text-[15px] font-semibold text-text-primary">Live Platform Events</p>
+            <Zap size={14} className="text-amber-500 ml-0.5" />
           </div>
 
-          <div style={S.eventList}>
+          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-2">
             {events.length === 0 ? (
-              <p style={S.emptyEvent}>Waiting for events… (connected to /admin socket)</p>
+              <p className="text-center py-6 text-[13px] text-text-muted m-0">Waiting for events… (connected to /admin socket)</p>
             ) : (
               events.map((ev) => {
                 const cfg = {
-                  'payment:success':      { icon: CheckCircle, color: '#4ade80', label: 'Payment Success' },
-                  'payment:failed':       { icon: XCircle,     color: '#f87171', label: 'Payment Failed' },
-                  'subscription:created':  { icon: Zap,         color: '#60a5fa', label: 'New Subscription' },
-                  'subscription:upgraded': { icon: TrendingUp,  color: '#c084fc', label: 'Plan Upgraded' },
-                  'subscription:downgraded':{ icon: Activity,   color: '#fb923c', label: 'Downgrade Scheduled' },
-                }[ev.type] || { icon: Activity, color: '#8b8bad', label: ev.type };
+                  'payment:success':      { icon: CheckCircle, colorClass: 'text-emerald-400', bgClass: 'bg-emerald-500/10', borderClass: 'border-emerald-500/20', label: 'Payment Success' },
+                  'payment:failed':       { icon: XCircle,     colorClass: 'text-red-400',     bgClass: 'bg-red-500/10',     borderClass: 'border-red-500/20',     label: 'Payment Failed' },
+                  'subscription:created':  { icon: Zap,         colorClass: 'text-blue-400',    bgClass: 'bg-blue-500/10',    borderClass: 'border-blue-500/20',    label: 'New Subscription' },
+                  'subscription:upgraded': { icon: TrendingUp,  colorClass: 'text-purple-400',  bgClass: 'bg-purple-500/10',  borderClass: 'border-purple-500/20',  label: 'Plan Upgraded' },
+                  'subscription:downgraded':{ icon: Activity,   colorClass: 'text-orange-400',  bgClass: 'bg-orange-500/10',  borderClass: 'border-orange-500/20',  label: 'Downgrade Scheduled' },
+                }[ev.type] || { icon: Activity, colorClass: 'text-text-muted', bgClass: 'bg-surface-secondary', borderClass: 'border-border', label: ev.type };
 
                 const Icon    = cfg.icon;
-                const success = ev.type === 'payment:success' || ev.type === 'subscription:created' || ev.type === 'subscription:upgraded';
 
                 const descParts = [];
                 if (ev.data?.tenantName)  descParts.push(ev.data.tenantName);
@@ -349,13 +247,13 @@ export default function AdminDashboardPage() {
                 if (ev.data?.amountPaid)  descParts.push(formatINR(ev.data.amountPaid));
 
                 return (
-                  <div key={ev.id} style={{ ...S.eventItem(success), borderColor: `${cfg.color}25`, background: `${cfg.color}08` }}>
-                    <Icon size={16} color={cfg.color} style={{ flexShrink: 0, marginTop: 1 }} />
-                    <div style={S.eventMeta}>
-                      <p style={S.eventType(success)}>{cfg.label}</p>
-                      <p style={S.eventDesc}>{descParts.join(' · ') || 'Platform event'}</p>
+                  <div key={ev.id} className={`flex items-start gap-2.5 px-3 py-2.5 rounded-xl border ${cfg.bgClass} ${cfg.borderClass}`}>
+                    <Icon size={16} className={`${cfg.colorClass} shrink-0 mt-0.5`} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`m-0 text-[13px] font-semibold ${cfg.colorClass}`}>{cfg.label}</p>
+                      <p className="m-0 mt-0.5 text-[12px] text-text-muted overflow-hidden text-ellipsis whitespace-nowrap">{descParts.join(' · ') || 'Platform event'}</p>
                     </div>
-                    <span style={S.eventTime}>{timeAgo(ev.ts)}</span>
+                    <span className="text-[11px] text-text-muted shrink-0">{timeAgo(ev.ts)}</span>
                   </div>
                 );
               })

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Users, UserPlus, Trash2, Shield, ChevronDown, Info } from 'lucide-react';
+import { Users, UserPlus, Trash2, Shield, Info, Loader2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import DashboardLayout from '../../components/layout/DashboardLayout.jsx';
-import { getMembers, inviteMember, removeMember } from '../../services/subscriptionService.js';
-import { getSubscription } from '../../services/subscriptionService.js';
+import { getMembers, inviteMember, removeMember, getSubscription } from '../../services/subscriptionService.js';
 import api from '../../services/api.js';
 import { formatDate } from '../../utils/helpers.js';
 
@@ -13,8 +12,8 @@ const ROLES = [
   {
     value: 'tenant_member',
     label: 'Member',
-    color: 'var(--color-text-muted)',
-    badgeClass: 'badge badge-neutral',
+    color: 'text-text-muted',
+    badgeClass: 'bg-surface-secondary text-text-muted border border-border',
     description: 'Standard team member',
     permissions: [
       'View dashboard & analytics',
@@ -30,8 +29,8 @@ const ROLES = [
   {
     value: 'finance_member',
     label: 'Finance',
-    color: '#34d399',
-    badgeClass: 'badge badge-success',
+    color: 'text-success',
+    badgeClass: 'bg-success/10 text-success border border-success/20',
     description: 'Billing & finance access only',
     permissions: [
       'View and download invoices',
@@ -47,8 +46,8 @@ const ROLES = [
   {
     value: 'tenant_admin',
     label: 'Admin',
-    color: '#a78bfa',
-    badgeClass: 'badge badge-purple',
+    color: 'text-primary',
+    badgeClass: 'bg-primary/10 text-primary border border-primary/20',
     description: 'Full workspace admin',
     permissions: [
       'Full access to all features',
@@ -127,7 +126,7 @@ export default function MembersPage() {
     setActionLoading(true);
     try {
       await removeMember(tenantId, removeTarget._id);
-      showToast(`${removeTarget.firstName || removeTarget.name} removed from workspace.`);
+      showToast(`✅ ${removeTarget.firstName || removeTarget.name} removed from workspace.`);
       setRemoveTarget(null);
       await load();
     } catch (err) {
@@ -143,7 +142,7 @@ export default function MembersPage() {
     setActionLoading(true);
     try {
       await api.patch(`/tenants/${tenantId}/members/${roleTarget.member._id}/role`, { role: roleTarget.newRole });
-      showToast(`Role updated to ${getRoleDef(roleTarget.newRole).label}`);
+      showToast(`✅ Role updated to ${getRoleDef(roleTarget.newRole).label}`);
       setRoleTarget(null);
       await load();
     } catch (err) {
@@ -162,19 +161,21 @@ export default function MembersPage() {
   const atLimit    = totalSeats > 0 && usedSeats >= totalSeats;
 
   return (
-    <DashboardLayout>
-      <div style={{ maxWidth: 1000 }}>
-        <div className="page-header">
+    <DashboardLayout title="Team Members">
+      <div className="max-w-[1000px] font-sans text-text-primary">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-7">
           <div>
-            <h1 className="page-title">
-              <Users size={22} style={{ display: 'inline', marginRight: 10, verticalAlign: 'middle' }} />
+            <h1 className="m-0 text-[26px] font-bold text-text-primary flex items-center gap-2.5 tracking-tight">
+              <div className="w-9 h-9 rounded-[10px] bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                <Users size={18} className="text-primary" />
+              </div>
               Team Members
             </h1>
-            <p className="page-subtitle">Manage who has access to your workspace</p>
+            <p className="m-0 mt-1.5 text-sm text-text-muted">Manage who has access to your workspace</p>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="flex gap-2.5 items-center">
             <button
-              className="btn-secondary btn-sm"
+              className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors flex items-center gap-1.5"
               onClick={() => setShowRoleInfo(!showRoleInfo)}
               title="Role access guide"
             >
@@ -182,7 +183,7 @@ export default function MembersPage() {
             </button>
             {isAdmin && (
               <button
-                className="btn-primary"
+                className="px-4 py-2 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-[13px] font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed"
                 onClick={() => setShowModal(true)}
                 disabled={atLimit}
                 title={atLimit ? 'Seat limit reached — upgrade your plan to add more members' : ''}
@@ -193,36 +194,32 @@ export default function MembersPage() {
           </div>
         </div>
 
-        {error && <div className="alert alert-danger" onClick={() => setError('')}>{error}</div>}
-        {toast && <div className="alert alert-success">{toast}</div>}
+        {error && <div className="mb-6 p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm font-medium cursor-pointer" onClick={() => setError('')}>{error}</div>}
+        {toast && <div className="mb-6 p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm font-medium">{toast}</div>}
 
         {/* Role Access Guide */}
         {showRoleInfo && (
-          <div className="card" style={{ marginBottom: 24, padding: 24 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Shield size={16} style={{ color: 'var(--color-primary)' }} />
+          <div className="bg-surface border border-border rounded-2xl p-6 mb-6 shadow-sm">
+            <h3 className="text-[15px] font-bold mb-4 flex items-center gap-2 m-0">
+              <Shield size={16} className="text-primary" />
               Role Access Guide
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
               {ROLES.map((role) => (
-                <div key={role.value} style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 10, padding: '14px 16px',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span className={role.badgeClass}>{role.label}</span>
+                <div key={role.value} className="bg-surface-secondary/40 border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${role.badgeClass}`}>{role.label}</span>
                     {role.cannotInvite && (
-                      <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>(promote via Change Role)</span>
+                      <span className="text-[10px] text-text-muted">(promote via Change Role)</span>
                     )}
                   </div>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 10 }}>{role.description}</p>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 12 }}>
+                  <p className="text-xs text-text-muted mb-2.5">{role.description}</p>
+                  <ul className="list-none p-0 m-0 text-xs space-y-1">
                     {role.permissions.map((p) => (
-                      <li key={p} style={{ color: '#4ade80', marginBottom: 4 }}>✓ {p}</li>
+                      <li key={p} className="text-success flex items-start gap-1"><span className="shrink-0 mt-0.5">✓</span> <span>{p}</span></li>
                     ))}
                     {role.restricted.map((r) => (
-                      <li key={r} style={{ color: '#f87171', marginBottom: 4 }}>✗ {r}</li>
+                      <li key={r} className="text-danger flex items-start gap-1"><span className="shrink-0 mt-0.5">✗</span> <span>{r}</span></li>
                     ))}
                   </ul>
                 </div>
@@ -232,25 +229,25 @@ export default function MembersPage() {
         )}
 
         {/* Seat Usage */}
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontWeight: 500, fontSize: 14 }}>Team Seat Usage</span>
-            <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
+        <div className="bg-surface border border-border rounded-2xl p-6 mb-6 shadow-sm">
+          <div className="flex justify-between items-center mb-2.5">
+            <span className="font-semibold text-sm">Team Seat Usage</span>
+            <span className="text-[13px] text-text-muted">
               {usedSeats} / {totalSeats || '∞'} seats used
             </span>
           </div>
           {totalSeats > 0 && (
             <>
-              <div className="progress-bar-track">
+              <div className="h-2 bg-surface-secondary rounded-full overflow-hidden">
                 <div
-                  className={`progress-bar-fill${seatPct >= 100 ? ' danger' : seatPct >= 80 ? ' warning' : ''}`}
+                  className={`h-full transition-all duration-500 rounded-full ${seatPct >= 100 ? 'bg-danger' : seatPct >= 80 ? 'bg-warning' : 'bg-primary'}`}
                   style={{ width: `${seatPct}%` }}
                 />
               </div>
               {atLimit && (
-                <p style={{ fontSize: 12, color: 'var(--color-danger)', marginTop: 8 }}>
+                <p className="text-xs text-danger mt-2">
                   You've reached your seat limit.{' '}
-                  <a href="/dashboard/settings/subscription" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                  <a href="/dashboard/settings/subscription" className="text-danger underline hover:text-danger/80">
                     Upgrade your plan
                   </a>{' '}
                   to add more members.
@@ -261,170 +258,164 @@ export default function MembersPage() {
         </div>
 
         {/* Members Table */}
-        <div className="table-container">
-          {loading ? (
-            <div style={{ padding: 48, textAlign: 'center' }}>
-              <div className="btn-spinner" style={{ width: 32, height: 32, borderWidth: 3, margin: '0 auto', borderTopColor: 'var(--color-primary)' }} />
-            </div>
-          ) : members.length === 0 ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              <Users size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
-              <p>No members yet. Invite someone to get started.</p>
-            </div>
-          ) : (
-            <table className="data-table">
+        <div className="bg-surface border border-border rounded-2xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Last Login</th>
-                  {isAdmin && <th>Actions</th>}
+                <tr className="bg-surface-secondary/50 border-b border-border">
+                  {['Name', 'Email', 'Role', 'Status', 'Last Login', isAdmin && 'Actions'].filter(Boolean).map((h) => (
+                    <th key={h} className="px-4 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.06em] whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {members.map((m) => {
-                  const roleDef   = getRoleDef(m.role);
-                  const isSelf    = m._id === user?.id || m._id === user?._id;
-                  const isOwner   = m.role === 'tenant_admin' && isSelf;
-                  return (
-                    <tr key={m._id}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{
-                            width: 32, height: 32, borderRadius: '50%',
-                            background: 'linear-gradient(135deg, var(--color-primary), hsl(220,90%,60%))',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 12, fontWeight: 600, color: '#fff', flexShrink: 0,
-                          }}>
-                            {(m.firstName?.[0] || m.name?.[0] || '?').toUpperCase()}
-                          </div>
-                          <div>
-                            <span style={{ fontWeight: 500, fontSize: 14 }}>
-                              {m.firstName && m.lastName ? `${m.firstName} ${m.lastName}` : m.name || 'Unknown'}
-                            </span>
-                            {isSelf && (
-                              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', marginLeft: 6 }}>(you)</span>
-                            )}
-                          </div>
-                        </div>
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <tr key={i} className="border-b border-border last:border-0">
+                      <td colSpan={isAdmin ? 6 : 5} className="p-0">
+                        <div className="h-16 bg-surface-secondary/40 animate-pulse my-0.5" />
                       </td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{m.email}</td>
-                      <td>
-                        <span className={roleDef.badgeClass}>{roleDef.label}</span>
-                      </td>
-                      <td>
-                        <span className={m.status === 'active' ? 'badge badge-success' : m.status === 'invited' ? 'badge badge-warning' : 'badge badge-neutral'}>
-                          {m.status === 'invited' ? 'Pending' : m.status === 'active' ? 'Active' : m.status || 'Active'}
-                        </span>
-                      </td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
-                        {m.lastLoginAt ? formatDate(m.lastLoginAt) : 'Never'}
-                      </td>
-                      {isAdmin && (
-                        <td>
-                          {!isOwner ? (
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              {/* Change Role dropdown */}
-                              <select
-                                value={m.role}
-                                onChange={(e) => {
-                                  if (e.target.value !== m.role) {
-                                    setRoleTarget({ member: m, newRole: e.target.value });
-                                  }
-                                }}
-                                style={{
-                                  fontSize: 12, padding: '3px 6px',
-                                  background: 'var(--color-surface)',
-                                  border: '1px solid rgba(255,255,255,0.1)',
-                                  borderRadius: 6, color: 'var(--color-text)',
-                                  cursor: 'pointer',
-                                }}
-                                title="Change role"
-                              >
-                                <option value="tenant_admin">Admin</option>
-                                <option value="tenant_member">Member</option>
-                                <option value="finance_member">Finance</option>
-                              </select>
-                              <button
-                                className="btn-ghost btn-sm"
-                                style={{ color: 'var(--color-danger)' }}
-                                onClick={() => setRemoveTarget(m)}
-                                title="Remove member"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          ) : (
-                            <span style={{ color: 'var(--color-text-subtle)', fontSize: 12 }}>Owner</span>
-                          )}
-                        </td>
-                      )}
                     </tr>
-                  );
-                })}
+                  ))
+                ) : members.length === 0 ? (
+                  <tr>
+                    <td colSpan={isAdmin ? 6 : 5} className="text-center py-16 text-text-muted">
+                      <Users size={48} className="mx-auto mb-3 text-text-muted/40" />
+                      <p className="text-sm m-0">No members yet. Invite someone to get started.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  members.map((m) => {
+                    const roleDef   = getRoleDef(m.role);
+                    const isSelf    = m._id === user?.id || m._id === user?._id;
+                    const isOwner   = m.role === 'tenant_admin' && isSelf;
+                    return (
+                      <tr key={m._id} className="border-b border-border transition-colors hover:bg-surface-secondary/30 last:border-0">
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                              {(m.firstName?.[0] || m.name?.[0] || '?').toUpperCase()}
+                            </div>
+                            <div>
+                              <span className="font-semibold text-sm">
+                                {m.firstName && m.lastName ? `${m.firstName} ${m.lastName}` : m.name || 'Unknown'}
+                              </span>
+                              {isSelf && (
+                                <span className="text-[10px] text-text-muted ml-1.5">(you)</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-text-muted text-[13px]">
+                          {m.email}
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${roleDef.badgeClass}`}>
+                            {roleDef.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${
+                            m.status === 'active' ? 'bg-success/10 text-success border border-success/20' : 
+                            m.status === 'invited' ? 'bg-warning/10 text-warning border border-warning/20' : 
+                            'bg-surface-secondary text-text-muted border border-border'
+                          }`}>
+                            {m.status === 'invited' ? 'Pending' : m.status === 'active' ? 'Active' : m.status || 'Active'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-text-muted text-[13px]">
+                          {m.lastLoginAt ? formatDate(m.lastLoginAt) : 'Never'}
+                        </td>
+                        {isAdmin && (
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            {!isOwner ? (
+                              <div className="flex gap-1.5 items-center">
+                                <select
+                                  value={m.role}
+                                  onChange={(e) => {
+                                    if (e.target.value !== m.role) {
+                                      setRoleTarget({ member: m, newRole: e.target.value });
+                                    }
+                                  }}
+                                  className="text-xs px-1.5 py-1 bg-surface border border-border rounded text-text-primary cursor-pointer hover:border-primary transition-colors outline-none"
+                                  title="Change role"
+                                >
+                                  <option value="tenant_admin">Admin</option>
+                                  <option value="tenant_member">Member</option>
+                                  <option value="finance_member">Finance</option>
+                                </select>
+                                <button
+                                  className="p-1.5 rounded bg-transparent border-none text-danger hover:bg-danger/10 cursor-pointer transition-colors flex items-center justify-center"
+                                  onClick={() => setRemoveTarget(m)}
+                                  title="Remove member"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-text-muted/50 text-xs">Owner</span>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
-          )}
+          </div>
         </div>
 
         {/* ── Invite Modal ─────────────────────────────────────────────────── */}
         {showModal && (
-          <div className="modal-overlay" onClick={() => { setShowModal(false); reset(); }}>
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
-              <h3 className="modal-title">Invite Team Member</h3>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginBottom: 20 }}>
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={() => { setShowModal(false); reset(); }}>
+            <div className="bg-surface border border-border rounded-2xl shadow-xl w-full max-w-[440px] p-6 text-text-primary" onClick={(e) => e.stopPropagation()}>
+              <h3 className="m-0 text-xl font-bold mb-2">Invite Team Member</h3>
+              <p className="text-sm text-text-muted mb-5">
                 They'll receive an email invitation to join your workspace.
               </p>
               <form onSubmit={handleSubmit(onInvite)}>
-                {/* Email */}
-                <div className="form-group">
-                  <label className="form-label">Email Address *</label>
+                <div className="mb-4">
+                  <label className="block text-[13px] font-semibold text-text-primary mb-1.5">Email Address *</label>
                   <input
                     id="invite-email"
                     type="email"
-                    className={`form-input ${errors.email ? 'is-invalid' : ''}`}
+                    className={`w-full px-3.5 py-2.5 rounded-lg border bg-surface text-text-primary text-[13px] outline-none transition-colors ${errors.email ? 'border-danger focus:border-danger focus:ring-1 focus:ring-danger' : 'border-border focus:border-primary focus:ring-1 focus:ring-primary'}`}
                     placeholder="colleague@company.com"
                     {...register('email', {
                       required: 'Email is required',
                       pattern: { value: /\S+@\S+\.\S+/, message: 'Invalid email' },
                     })}
                   />
-                  {errors.email && <span className="form-error">{errors.email.message}</span>}
+                  {errors.email && <span className="text-xs text-danger mt-1 block">{errors.email.message}</span>}
                 </div>
 
-                {/* Role */}
-                <div className="form-group">
-                  <label className="form-label">Role *</label>
+                <div className="mb-6">
+                  <label className="block text-[13px] font-semibold text-text-primary mb-1.5">Role *</label>
                   <select
                     id="invite-role"
-                    className="form-input"
-                    style={{ cursor: 'pointer' }}
+                    className={`w-full px-3.5 py-2.5 rounded-lg border bg-surface text-text-primary text-[13px] outline-none transition-colors cursor-pointer ${errors.role ? 'border-danger focus:border-danger focus:ring-1 focus:ring-danger' : 'border-border focus:border-primary focus:ring-1 focus:ring-primary'}`}
                     {...register('role', { required: 'Role is required' })}
                   >
                     <option value="tenant_member">Member — Standard team access</option>
                     <option value="finance_member">Finance — Billing &amp; invoices only</option>
                   </select>
-                  {errors.role && <span className="form-error">{errors.role.message}</span>}
-                  {/* Role hint */}
+                  {errors.role && <span className="text-xs text-danger mt-1 block">{errors.role.message}</span>}
+                  
                   {selectedRole && (
-                    <div style={{
-                      marginTop: 10, padding: '10px 14px',
-                      background: 'rgba(255,255,255,0.04)',
-                      borderRadius: 8, fontSize: 12,
-                      borderLeft: `3px solid ${getRoleDef(selectedRole).color}`,
-                    }}>
-                      <strong style={{ color: getRoleDef(selectedRole).color }}>
+                    <div className="mt-2.5 p-3 rounded-lg bg-surface-secondary/40 text-xs border-l-2" style={{ borderColor: getRoleDef(selectedRole).color === 'text-text-muted' ? 'var(--color-text-muted)' : `var(--color-${getRoleDef(selectedRole).color.replace('text-', '')})` }}>
+                      <strong className={getRoleDef(selectedRole).color}>
                         {getRoleDef(selectedRole).label}
                       </strong>
-                      <ul style={{ margin: '6px 0 0', paddingLeft: 16, color: 'var(--color-text-muted)' }}>
+                      <ul className="mt-1.5 mb-0 pl-4 text-text-muted list-disc">
                         {getRoleDef(selectedRole).permissions.map((p) => (
-                          <li key={p}>{p}</li>
+                          <li key={p} className="mb-0.5">{p}</li>
                         ))}
                       </ul>
                       {getRoleDef(selectedRole).restricted.length > 0 && (
-                        <p style={{ marginTop: 6, color: '#f87171', fontStyle: 'italic' }}>
+                        <p className="mt-1.5 mb-0 text-danger italic">
                           Note: {getRoleDef(selectedRole).restricted[0]}
                         </p>
                       )}
@@ -432,17 +423,17 @@ export default function MembersPage() {
                   )}
                 </div>
 
-                <div className="modal-actions">
+                <div className="flex justify-end gap-2">
                   <button
                     type="button"
-                    className="btn-secondary"
+                    className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                     onClick={() => { setShowModal(false); reset(); }}
                     disabled={actionLoading}
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn-primary" disabled={actionLoading}>
-                    {actionLoading ? <span className="btn-spinner" /> : <><UserPlus size={15} /> Send Invite</>}
+                  <button type="submit" className="px-4 py-2 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-[13px] font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-70 disabled:cursor-not-allowed" disabled={actionLoading}>
+                    {actionLoading ? <Loader2 size={15} className="animate-spin" /> : <><UserPlus size={15} /> Send Invite</>}
                   </button>
                 </div>
               </form>
@@ -452,29 +443,29 @@ export default function MembersPage() {
 
         {/* ── Change Role Confirmation Modal ───────────────────────────────── */}
         {roleTarget && (
-          <div className="modal-overlay" onClick={() => setRoleTarget(null)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
-              <h3 className="modal-title">Change Role</h3>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginBottom: 16 }}>
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setRoleTarget(null)}>
+            <div className="bg-surface border border-border rounded-2xl shadow-xl w-full max-w-[400px] p-6 text-text-primary" onClick={(e) => e.stopPropagation()}>
+              <h3 className="m-0 text-xl font-bold mb-2">Change Role</h3>
+              <p className="text-[13px] text-text-muted mb-4 leading-relaxed">
                 Change <strong>{roleTarget.member.firstName || roleTarget.member.name}</strong>'s role from{' '}
-                <span className={getRoleDef(roleTarget.member.role).badgeClass}>
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getRoleDef(roleTarget.member.role).badgeClass}`}>
                   {getRoleDef(roleTarget.member.role).label}
                 </span>{' '}
                 to{' '}
-                <span className={getRoleDef(roleTarget.newRole).badgeClass}>
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getRoleDef(roleTarget.newRole).badgeClass}`}>
                   {getRoleDef(roleTarget.newRole).label}
                 </span>
                 ?
               </p>
-              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 20 }}>
+              <p className="text-xs text-text-muted mb-5 leading-relaxed">
                 {getRoleDef(roleTarget.newRole).description}. Their access will update immediately.
               </p>
-              <div className="modal-actions">
-                <button className="btn-secondary" onClick={() => setRoleTarget(null)} disabled={actionLoading}>
+              <div className="flex justify-end gap-2">
+                <button className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors disabled:opacity-70 disabled:cursor-not-allowed" onClick={() => setRoleTarget(null)} disabled={actionLoading}>
                   Cancel
                 </button>
-                <button className="btn-primary" onClick={onChangeRole} disabled={actionLoading}>
-                  {actionLoading ? <span className="btn-spinner" /> : 'Confirm Change'}
+                <button className="px-4 py-2 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 min-w-[120px] disabled:opacity-70 disabled:cursor-not-allowed" onClick={onChangeRole} disabled={actionLoading}>
+                  {actionLoading ? <Loader2 size={15} className="animate-spin" /> : 'Confirm Change'}
                 </button>
               </div>
             </div>
@@ -483,18 +474,18 @@ export default function MembersPage() {
 
         {/* ── Remove Confirmation Modal ─────────────────────────────────────── */}
         {removeTarget && (
-          <div className="modal-overlay" onClick={() => setRemoveTarget(null)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
-              <h3 className="modal-title">Remove {removeTarget.firstName || removeTarget.name}?</h3>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginBottom: 20 }}>
+          <div className="fixed inset-0 z-[999] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4" onClick={() => setRemoveTarget(null)}>
+            <div className="bg-surface border border-border rounded-2xl shadow-xl w-full max-w-[400px] p-6 text-text-primary" onClick={(e) => e.stopPropagation()}>
+              <h3 className="m-0 text-xl font-bold mb-2">Remove {removeTarget.firstName || removeTarget.name}?</h3>
+              <p className="text-[13px] text-text-muted mb-5 leading-relaxed">
                 They will immediately lose access to this workspace. This action cannot be undone.
               </p>
-              <div className="modal-actions">
-                <button className="btn-secondary" onClick={() => setRemoveTarget(null)} disabled={actionLoading}>
+              <div className="flex justify-end gap-2">
+                <button className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors disabled:opacity-70 disabled:cursor-not-allowed" onClick={() => setRemoveTarget(null)} disabled={actionLoading}>
                   Cancel
                 </button>
-                <button className="btn-danger" onClick={onRemove} disabled={actionLoading}>
-                  {actionLoading ? <span className="btn-spinner" /> : 'Remove Member'}
+                <button className="px-4 py-2 rounded-lg border-none bg-danger hover:bg-red-600 text-white cursor-pointer text-[13px] font-bold transition-colors flex items-center justify-center min-w-[120px] disabled:opacity-70 disabled:cursor-not-allowed" onClick={onRemove} disabled={actionLoading}>
+                  {actionLoading ? <Loader2 size={15} className="animate-spin" /> : 'Remove Member'}
                 </button>
               </div>
             </div>

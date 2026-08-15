@@ -2,26 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, Users, Zap, RefreshCw, ExternalLink,
-  ArrowUpCircle, AlertCircle, CheckCircle2, ChevronRight,
+  ArrowUpCircle, AlertCircle, CheckCircle2, ChevronRight, Loader2,
 } from 'lucide-react';
 import AdminLayout from '../../components/layout/AdminLayout.jsx';
 import { getExpansionOpportunities, computeHealthScores } from '../../services/healthService.js';
-
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const TEXT   = '#f0f0ff';
-const MUTED  = '#8b8bad';
-const BORDER = 'rgba(255,255,255,0.08)';
-const CARD   = 'rgba(255,255,255,0.04)';
-const ACCENT = '#6c63ff';
-const GREEN  = '#4ade80';
-const ORANGE = '#fb923c';
-const RED    = '#f87171';
-const BLUE   = '#60a5fa';
-
-const card = {
-  background: CARD, border: `1px solid ${BORDER}`,
-  borderRadius: 16, padding: '20px 22px',
-};
 
 function formatINR(paise) {
   if (paise == null || paise === 0) return 'Free';
@@ -29,21 +13,26 @@ function formatINR(paise) {
 }
 
 function ScoreBar({ score }) {
-  const color = score >= 70 ? GREEN : score >= 45 ? ORANGE : RED;
+  const colorClass = score >= 70 ? 'bg-emerald-500' : score >= 45 ? 'bg-orange-500' : 'bg-red-500';
+  const textClass = score >= 70 ? 'text-emerald-500' : score >= 45 ? 'text-orange-500' : 'text-red-500';
+  
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.08)' }}>
-        <div style={{ width: `${score}%`, height: '100%', borderRadius: 4, background: color, transition: 'width 0.5s ease' }} />
+    <div className="flex items-center gap-2.5">
+      <div className="flex-1 h-1.5 rounded-full bg-surface-secondary overflow-hidden">
+        <div 
+          className={`h-full rounded-full transition-all duration-500 ease-out ${colorClass}`}
+          style={{ width: `${score}%` }} 
+        />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 700, color, minWidth: 34, textAlign: 'right' }}>{score}</span>
+      <span className={`text-[12px] font-bold min-w-[34px] text-right ${textClass}`}>{score}</span>
     </div>
   );
 }
 
 function UtilBadge({ pct }) {
-  const color = pct >= 90 ? RED : pct >= 70 ? ORANGE : GREEN;
+  const badgeClass = pct >= 90 ? 'bg-red-500/15 text-red-500' : pct >= 70 ? 'bg-orange-500/15 text-orange-500' : 'bg-emerald-500/15 text-emerald-500';
   return (
-    <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: `${color}22`, color }}>
+    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${badgeClass}`}>
       {pct}%
     </span>
   );
@@ -51,73 +40,69 @@ function UtilBadge({ pct }) {
 
 function OpportunityCard({ item, onViewTenant }) {
   const urgency = item.opportunityScore >= 75 ? 'High' : item.opportunityScore >= 50 ? 'Medium' : 'Low';
-  const urgencyColor = urgency === 'High' ? RED : urgency === 'Medium' ? ORANGE : BLUE;
+  
+  // Define colors based on urgency
+  const topBarClass = urgency === 'High' ? 'from-red-500' : urgency === 'Medium' ? 'from-orange-500' : 'from-blue-500';
+  const badgeClass = urgency === 'High' ? 'bg-red-500/15 text-red-500' : urgency === 'Medium' ? 'bg-orange-500/15 text-orange-500' : 'bg-blue-500/15 text-blue-500';
+  const healthClass = item.healthScore >= 70 ? 'text-emerald-500' : item.healthScore >= 50 ? 'text-orange-500' : 'text-red-500';
 
   return (
-    <div style={{
-      ...card,
-      transition: 'border-color 0.15s, transform 0.1s',
-      cursor: 'pointer',
-      position: 'relative',
-      overflow: 'hidden',
-    }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = `${ACCENT}44`; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; }}
+    <div 
+      className="bg-surface border border-border rounded-2xl p-5 relative overflow-hidden transition-colors hover:border-primary/40 cursor-pointer shadow-sm group"
     >
       {/* Top accent line */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-        background: `linear-gradient(90deg, ${urgencyColor}, transparent)`,
-      }} />
+      <div className={`absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r ${topBarClass} to-transparent opacity-80`} />
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div className="flex items-start justify-between mb-4 mt-1">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT }}>{item.tenantName}</p>
-            <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: `${urgencyColor}22`, color: urgencyColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <p className="m-0 text-[15px] font-bold text-text-primary tracking-tight">{item.tenantName}</p>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.06em] ${badgeClass}`}>
               {urgency} Opportunity
             </span>
           </div>
-          <p style={{ margin: 0, fontSize: 12, color: MUTED }}>{item.currentPlan} · {formatINR(item.currentPlanPrice)}/mo</p>
+          <p className="m-0 text-[12px] text-text-muted">{item.currentPlan} &middot; {formatINR(item.currentPlanPrice)}/mo</p>
         </div>
         <button
           onClick={() => onViewTenant(item.tenantId)}
-          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, border: `1px solid ${BORDER}`, background: 'transparent', color: MUTED, cursor: 'pointer', fontSize: 12 }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[12px] transition-colors"
         >
           View <ExternalLink size={12} />
         </button>
       </div>
 
       {/* Metrics row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 14 }}>
-        <div style={{ textAlign: 'center', padding: '10px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
-          <p style={{ margin: '0 0 2px', fontSize: 10, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Seats</p>
-          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: TEXT }}>{item.usedSeats}<span style={{ color: MUTED, fontSize: 12 }}>/{item.maxSeats}</span></p>
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="text-center p-2.5 bg-surface-secondary/50 rounded-xl">
+          <p className="m-0 mb-1 text-[10px] text-text-muted uppercase tracking-[0.06em] font-semibold">Seats</p>
+          <p className="m-0 text-[16px] font-bold text-text-primary mb-1">
+            {item.usedSeats}<span className="text-text-muted text-[12px] font-medium">/{item.maxSeats}</span>
+          </p>
           <UtilBadge pct={item.seatUtilPct} />
         </div>
-        <div style={{ textAlign: 'center', padding: '10px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
-          <p style={{ margin: '0 0 2px', fontSize: 10, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Health</p>
-          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: item.healthScore >= 70 ? GREEN : item.healthScore >= 50 ? ORANGE : RED }}>{item.healthScore ?? '—'}</p>
+        <div className="text-center p-2.5 bg-surface-secondary/50 rounded-xl">
+          <p className="m-0 mb-1 text-[10px] text-text-muted uppercase tracking-[0.06em] font-semibold">Health</p>
+          <p className={`m-0 text-[16px] font-bold mt-1 ${healthClass}`}>{item.healthScore ?? '—'}</p>
         </div>
-        <div style={{ textAlign: 'center', padding: '10px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
-          <p style={{ margin: '0 0 2px', fontSize: 10, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tenure</p>
-          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: TEXT }}>{Math.floor(item.subscriptionAge / 30)}mo</p>
+        <div className="text-center p-2.5 bg-surface-secondary/50 rounded-xl">
+          <p className="m-0 mb-1 text-[10px] text-text-muted uppercase tracking-[0.06em] font-semibold">Tenure</p>
+          <p className="m-0 text-[16px] font-bold text-text-primary mt-1">{Math.floor(item.subscriptionAge / 30)}mo</p>
         </div>
       </div>
 
       {/* Opportunity score */}
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Opportunity Score</span>
+      <div className="mb-3">
+        <div className="flex justify-between mb-1.5">
+          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-[0.06em]">Opportunity Score</span>
         </div>
         <ScoreBar score={item.opportunityScore} />
       </div>
 
       {/* Signals */}
       {item.signals.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div className="flex gap-1.5 flex-wrap mb-4">
           {item.signals.map((sig, i) => (
-            <span key={i} style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', color: MUTED, fontSize: 11 }}>
+            <span key={i} className="px-2.5 py-1 rounded-full bg-surface-secondary/80 text-text-muted text-[11px] font-medium border border-border">
               {sig}
             </span>
           ))}
@@ -126,14 +111,14 @@ function OpportunityCard({ item, onViewTenant }) {
 
       {/* Recommended upgrade */}
       {item.recommendedUpgrade && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 9, background: 'rgba(108,99,255,0.08)', border: '1px solid rgba(108,99,255,0.2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ArrowUpCircle size={15} color={ACCENT} />
-            <span style={{ fontSize: 12, color: '#a78bfa' }}>
-              Upgrade to <strong>{item.recommendedUpgrade.planName}</strong> ({formatINR(item.recommendedUpgrade.price)}/mo)
+        <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/20 group-hover:bg-primary/10 transition-colors">
+          <div className="flex items-center gap-2">
+            <ArrowUpCircle size={15} className="text-primary" />
+            <span className="text-[12px] text-primary">
+              Upgrade to <strong className="font-semibold">{item.recommendedUpgrade.planName}</strong> ({formatINR(item.recommendedUpgrade.price)}/mo)
             </span>
           </div>
-          <ChevronRight size={14} color={ACCENT} />
+          <ChevronRight size={14} className="text-primary" />
         </div>
       )}
     </div>
@@ -183,30 +168,30 @@ export default function ExpansionPage() {
   }, 0);
 
   return (
-    <AdminLayout>
-      <div style={{ color: TEXT }}>
+    <AdminLayout title="Expansion">
+      <div className="font-sans text-text-primary">
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-7">
           <div>
-            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: TEXT, letterSpacing: '-0.02em' }}>
+            <h1 className="m-0 text-[26px] font-bold text-text-primary tracking-tight">
               Expansion Opportunities
             </h1>
-            <p style={{ margin: '4px 0 0', fontSize: 14, color: MUTED }}>
+            <p className="m-0 mt-1.5 text-sm text-text-muted max-w-xl">
               Tenants ranked by upgrade likelihood — seat pressure, health, and payment reliability
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div className="flex gap-2.5">
             <button
               onClick={triggerCompute}
               disabled={computing}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: `1px solid rgba(108,99,255,0.3)`, background: 'rgba(108,99,255,0.08)', color: '#a78bfa', cursor: computing ? 'not-allowed' : 'pointer', fontSize: 13, opacity: computing ? 0.7 : 1 }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-primary/30 bg-primary/10 text-primary cursor-pointer text-[13px] font-semibold disabled:opacity-70 disabled:cursor-not-allowed hover:bg-primary/15 transition-colors"
             >
-              <Zap size={14} />
+              {computing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
               {computing ? 'Recomputing…' : 'Recompute Scores'}
             </button>
             <button
               onClick={load}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 9, border: `1px solid ${BORDER}`, background: CARD, color: MUTED, cursor: 'pointer', fontSize: 13 }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-surface text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors"
             >
               <RefreshCw size={14} />
               {lastRefresh ? lastRefresh.toLocaleTimeString() : 'Refresh'}
@@ -216,20 +201,20 @@ export default function ExpansionPage() {
 
         {/* Summary KPI strip */}
         {!loading && data.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
             {[
-              { label: 'Total Candidates', value: data.length, icon: Users, color: BLUE },
-              { label: 'High Priority',    value: highCount,   icon: AlertCircle, color: RED },
-              { label: 'Medium Priority',  value: mediumCount, icon: TrendingUp,  color: ORANGE },
-              { label: 'Potential MRR Uplift', value: `₹${totalUpsellMrr.toLocaleString('en-IN')}`, icon: Zap, color: GREEN },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <div key={label} style={{ ...card, display: 'flex', gap: 14, alignItems: 'center' }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, background: `${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon size={18} color={color} />
+              { label: 'Total Candidates', value: data.length, icon: Users, colorClass: 'text-blue-500', bgClass: 'bg-blue-500/10' },
+              { label: 'High Priority',    value: highCount,   icon: AlertCircle, colorClass: 'text-red-500', bgClass: 'bg-red-500/10' },
+              { label: 'Medium Priority',  value: mediumCount, icon: TrendingUp,  colorClass: 'text-orange-500', bgClass: 'bg-orange-500/10' },
+              { label: 'Potential MRR Uplift', value: `₹${totalUpsellMrr.toLocaleString('en-IN')}`, icon: Zap, colorClass: 'text-emerald-500', bgClass: 'bg-emerald-500/10' },
+            ].map(({ label, value, icon: Icon, colorClass, bgClass }) => (
+              <div key={label} className="bg-surface border border-border rounded-2xl p-5 flex items-center gap-3.5 shadow-sm hover:border-border/80 transition-colors">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bgClass}`}>
+                  <Icon size={18} className={colorClass} />
                 </div>
                 <div>
-                  <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: TEXT }}>{value}</p>
-                  <p style={{ margin: 0, fontSize: 12, color: MUTED }}>{label}</p>
+                  <p className="m-0 text-[22px] font-bold text-text-primary leading-tight">{value}</p>
+                  <p className="m-0 mt-0.5 text-[12px] font-medium text-text-muted uppercase tracking-[0.05em]">{label}</p>
                 </div>
               </div>
             ))}
@@ -238,29 +223,28 @@ export default function ExpansionPage() {
 
         {/* Content */}
         {loading && (
-          <div style={{ textAlign: 'center', padding: 80 }}>
-            <div style={{ width: 40, height: 40, borderRadius: '50%', border: `3px solid ${ACCENT}`, borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <p style={{ color: MUTED, margin: 0 }}>Analysing expansion opportunities…</p>
+          <div className="py-20 text-center">
+            <Loader2 size={40} className="text-primary animate-spin mx-auto mb-4" />
+            <p className="text-text-muted m-0 text-sm">Analysing expansion opportunities…</p>
           </div>
         )}
 
         {!loading && error && (
-          <div style={{ padding: '16px 20px', borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: RED }}>
+          <div className="mb-6 p-4 rounded-xl bg-danger/10 border border-danger/20 text-danger text-[14px] font-medium">
             {error}
           </div>
         )}
 
         {!loading && !error && data.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 80, color: MUTED }}>
-            <CheckCircle2 size={48} color={GREEN} style={{ margin: '0 auto 16px' }} />
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: TEXT }}>No expansion opportunities found</p>
-            <p style={{ margin: '6px 0 0', fontSize: 13 }}>All active tenants are either on the highest plan or have low seat utilization.</p>
+          <div className="py-20 text-center text-text-muted">
+            <CheckCircle2 size={48} className="text-emerald-500 mx-auto mb-4" />
+            <p className="m-0 text-[16px] font-bold text-text-primary mb-1.5">No expansion opportunities found</p>
+            <p className="m-0 text-[13px]">All active tenants are either on the highest plan or have low seat utilization.</p>
           </div>
         )}
 
         {!loading && !error && data.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: 20 }}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-5">
             {data.map(item => (
               <OpportunityCard
                 key={item.tenantId}

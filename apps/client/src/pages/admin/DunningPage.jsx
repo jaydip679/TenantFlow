@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertOctagon, RotateCcw, XCircle } from 'lucide-react';
+import { AlertOctagon, RotateCcw, XCircle, Loader2 } from 'lucide-react';
 import AdminLayout from '../../components/layout/AdminLayout.jsx';
 import { getActiveDunning, resetDunning, abandonDunning } from '../../services/adminService.js';
 import { formatCurrency, formatDateTime, formatDate } from '../../utils/helpers.js';
@@ -8,20 +8,18 @@ const STEPS = [0, 3, 7, 14];
 
 function StepIndicator({ currentStep }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div className="flex items-center gap-1.5 w-full max-w-[200px]">
       {STEPS.map((day, i) => (
         <React.Fragment key={day}>
-          <div style={{
-            width: 24, height: 24, borderRadius: '50%', fontSize: 11, fontWeight: 600,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: i <= currentStep ? 'var(--color-danger)' : 'var(--color-surface-2)',
-            color: i <= currentStep ? '#fff' : 'var(--color-text-muted)',
-            border: `2px solid ${i === currentStep ? 'var(--color-danger)' : 'var(--color-border)'}`,
-          }}>
+          <div className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 border-2 transition-colors ${
+            i <= currentStep ? 'bg-danger text-white border-danger' : 'bg-surface-secondary text-text-muted border-border'
+          }`}>
             {day}d
           </div>
           {i < STEPS.length - 1 && (
-            <div style={{ flex: 1, height: 2, minWidth: 16, background: i < currentStep ? 'var(--color-danger)' : 'var(--color-border)' }} />
+            <div className={`flex-1 h-0.5 min-w-[12px] transition-colors ${
+              i < currentStep ? 'bg-danger' : 'bg-border'
+            }`} />
           )}
         </React.Fragment>
       ))}
@@ -87,135 +85,146 @@ export default function DunningPage() {
   };
 
   return (
-    <AdminLayout>
-      <div style={{ maxWidth: 1200 }}>
-        <div className="page-header">
+    <AdminLayout title="Dunning">
+      <div className="max-w-[1200px] font-sans text-text-primary">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-7">
           <div>
-            <h1 className="page-title">
-              <AlertOctagon size={22} style={{ display: 'inline', marginRight: 10, verticalAlign: 'middle' }} />
+            <h1 className="m-0 text-[26px] font-bold text-text-primary flex items-center gap-2.5 tracking-tight">
+              <div className="w-9 h-9 rounded-[10px] bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                <AlertOctagon size={18} className="text-primary" />
+              </div>
               Dunning Records
             </h1>
-            <p className="page-subtitle">Active payment recovery workflows</p>
+            <p className="m-0 mt-1.5 text-sm text-text-muted">Active payment recovery workflows</p>
           </div>
           {!loading && (
-            <span className="badge badge-danger" style={{ fontSize: 14, padding: '6px 14px' }}>
+            <span className="px-3.5 py-1.5 rounded-full text-[13px] font-bold bg-danger/15 text-danger border border-danger/30">
               {records.length} active
             </span>
           )}
         </div>
 
-        {error && <div className="alert alert-danger">{error}</div>}
-        {toast && <div className="alert alert-success">{toast}</div>}
+        {error && <div className="mb-6 p-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm font-medium">{error}</div>}
+        {toast && <div className="mb-6 p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm font-medium">{toast}</div>}
 
-        <div className="table-container">
+        <div className="bg-surface border border-border rounded-2xl shadow-sm overflow-hidden">
           {loading ? (
-            <div style={{ padding: 48, textAlign: 'center' }}>
-              <div className="btn-spinner" style={{ width: 32, height: 32, borderWidth: 3, margin: '0 auto', borderTopColor: 'var(--color-primary)' }} />
+            <div className="p-16 flex justify-center">
+              <Loader2 size={36} className="text-primary animate-spin" />
             </div>
           ) : records.length === 0 ? (
-            <div className="empty-state">
-              <AlertOctagon size={40} className="empty-state-icon" />
-              <h3>No active dunning records</h3>
-              <p>All customers are in good standing.</p>
+            <div className="py-16 px-6 text-center text-text-muted">
+              <AlertOctagon size={48} className="mx-auto mb-4 opacity-40 text-text-muted" />
+              <h3 className="m-0 text-[17px] font-semibold text-text-primary mb-2">No active dunning records</h3>
+              <p className="m-0 text-sm">All customers are in good standing.</p>
             </div>
           ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Tenant</th>
-                  <th>Invoice</th>
-                  <th>Amount Due</th>
-                  <th>Step Progress</th>
-                  <th>Next Retry</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((rec) => (
-                  <tr key={rec._id}>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{rec.tenant?.name || rec.tenantId}</div>
-                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{rec.tenant?.slug}</div>
-                    </td>
-                    <td>
-                      <code style={{ fontSize: 12, color: 'var(--color-primary)' }}>
-                        {rec.invoice?.invoiceNumber || rec.invoiceId?.slice(-8)}
-                      </code>
-                    </td>
-                    <td style={{ fontWeight: 600, color: 'var(--color-danger)' }}>
-                      {formatCurrency(rec.invoice?.total || rec.amountDue || 0)}
-                    </td>
-                    <td style={{ minWidth: 180 }}>
-                      <StepIndicator currentStep={rec.currentStep || 0} />
-                    </td>
-                    <td style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
-                      {rec.nextRetryAt ? formatDate(rec.nextRetryAt) : '—'}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button
-                          className="btn-secondary btn-sm"
-                          onClick={() => setModal({ type: 'reset', record: rec })}
-                          title="Reset to step 0 and retry immediately"
-                        >
-                          <RotateCcw size={13} /> Reset
-                        </button>
-                        <button
-                          className="btn-danger btn-sm"
-                          onClick={() => setModal({ type: 'abandon', record: rec })}
-                          title="Abandon dunning and suspend tenant"
-                        >
-                          <XCircle size={13} /> Abandon
-                        </button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-surface-secondary/50 border-b border-border">
+                    <th className="px-5 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.05em]">Tenant</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.05em]">Invoice</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.05em]">Amount Due</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.05em]">Step Progress</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.05em]">Next Retry</th>
+                    <th className="px-5 py-3.5 text-[11px] font-semibold text-text-muted uppercase tracking-[0.05em]">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {records.map((rec) => (
+                    <tr key={rec._id} className="border-b border-border transition-colors hover:bg-surface-secondary/30 last:border-0">
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <div className="text-[13px] font-semibold text-text-primary">{rec.tenant?.name || rec.tenantId}</div>
+                        <div className="text-[12px] text-text-muted mt-0.5">{rec.tenant?.slug}</div>
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <code className="text-[12px] text-primary font-mono bg-primary/5 px-2 py-1 rounded border border-primary/10">
+                          {rec.invoice?.invoiceNumber || rec.invoiceId?.slice(-8)}
+                        </code>
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <div className="text-[13px] font-bold text-danger">
+                          {formatCurrency(rec.invoice?.total || rec.amountDue || 0)}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <StepIndicator currentStep={rec.currentStep || 0} />
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-[13px] text-text-muted">
+                        {rec.nextRetryAt ? formatDate(rec.nextRetryAt) : '—'}
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <div className="flex gap-2">
+                          <button
+                            className="px-3 py-1.5 rounded-lg text-[12px] font-semibold border-none bg-surface-secondary hover:bg-border text-text-primary cursor-pointer transition-colors flex items-center gap-1.5"
+                            onClick={() => setModal({ type: 'reset', record: rec })}
+                            title="Reset to step 0 and retry immediately"
+                          >
+                            <RotateCcw size={13} className="text-text-primary" /> Reset
+                          </button>
+                          <button
+                            className="px-3 py-1.5 rounded-lg text-[12px] font-semibold border-none bg-danger/10 hover:bg-danger/20 text-danger cursor-pointer transition-colors flex items-center gap-1.5"
+                            onClick={() => setModal({ type: 'abandon', record: rec })}
+                            title="Abandon dunning and suspend tenant"
+                          >
+                            <XCircle size={13} className="text-danger" /> Abandon
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
-        {/* Reset Modal */}
-        {modal?.type === 'reset' && (
-          <div className="modal-overlay" onClick={() => setModal(null)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h3 className="modal-title"><RotateCcw size={18} style={{ display: 'inline', marginRight: 8 }} />Reset Dunning?</h3>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginBottom: 20 }}>
-                This will reset dunning to step 0 and schedule an immediate retry for <strong>{modal.record.tenant?.name || 'this tenant'}</strong>.
-              </p>
-              <div className="modal-actions">
-                <button className="btn-secondary" onClick={() => setModal(null)} disabled={actionLoad}>Cancel</button>
-                <button className="btn-primary" onClick={handleReset} disabled={actionLoad}>
-                  {actionLoad ? <span className="btn-spinner" /> : 'Confirm Reset'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Abandon Modal */}
-        {modal?.type === 'abandon' && (
-          <div className="modal-overlay" onClick={() => setModal(null)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
-                <AlertOctagon size={28} color="var(--color-danger)" style={{ flexShrink: 0 }} />
-                <div>
-                  <h3 className="modal-title" style={{ margin: 0 }}>Abandon Dunning?</h3>
-                  <p style={{ color: 'var(--color-danger)', fontWeight: 500, fontSize: 14, marginTop: 6 }}>
-                    ⚠ This will immediately suspend the tenant.
+        {/* Modals */}
+        {modal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setModal(null)}>
+            <div className="bg-surface border border-border rounded-2xl p-6 w-full max-w-[420px] shadow-xl" onClick={(e) => e.stopPropagation()}>
+              
+              {modal.type === 'reset' && (
+                <>
+                  <h3 className="m-0 mb-4 text-[18px] font-bold text-text-primary flex items-center gap-2">
+                    <RotateCcw size={18} className="text-primary" /> Reset Dunning?
+                  </h3>
+                  <p className="m-0 mb-6 text-[14px] text-text-muted leading-relaxed">
+                    This will reset dunning to step 0 and schedule an immediate retry for <strong className="text-text-primary">{modal.record.tenant?.name || 'this tenant'}</strong>.
                   </p>
-                </div>
-              </div>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginBottom: 20 }}>
-                <strong>{modal.record.tenant?.name || 'This tenant'}</strong> will lose access to the platform immediately. This action cannot be undone without manually restoring their status.
-              </p>
-              <div className="modal-actions">
-                <button className="btn-secondary" onClick={() => setModal(null)} disabled={actionLoad}>Cancel</button>
-                <button className="btn-danger" onClick={handleAbandon} disabled={actionLoad}>
-                  {actionLoad ? <span className="btn-spinner" /> : 'Abandon & Suspend'}
-                </button>
-              </div>
+                  <div className="flex justify-end gap-3">
+                    <button className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors disabled:opacity-70 disabled:cursor-not-allowed" onClick={() => setModal(null)} disabled={actionLoad}>Cancel</button>
+                    <button className="px-4 py-2 rounded-lg border-none bg-primary hover:bg-primary-hover text-white font-semibold text-[13px] min-w-[120px] flex items-center justify-center cursor-pointer transition-colors disabled:opacity-70 disabled:cursor-not-allowed" onClick={handleReset} disabled={actionLoad}>
+                      {actionLoad ? <Loader2 size={16} className="animate-spin text-white" /> : 'Confirm Reset'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {modal.type === 'abandon' && (
+                <>
+                  <div className="flex gap-4 mb-4">
+                    <AlertOctagon size={28} className="text-danger shrink-0" />
+                    <div>
+                      <h3 className="m-0 text-[18px] font-bold text-text-primary">Abandon Dunning?</h3>
+                      <p className="m-0 mt-1.5 text-[14px] font-semibold text-danger">
+                        ⚠ This will immediately suspend the tenant.
+                      </p>
+                    </div>
+                  </div>
+                  <p className="m-0 mb-6 text-[14px] text-text-muted leading-relaxed">
+                    <strong className="text-text-primary">{modal.record.tenant?.name || 'This tenant'}</strong> will lose access to the platform immediately. This action cannot be undone without manually restoring their status.
+                  </p>
+                  <div className="flex justify-end gap-3">
+                    <button className="px-4 py-2 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-[13px] font-semibold transition-colors disabled:opacity-70 disabled:cursor-not-allowed" onClick={() => setModal(null)} disabled={actionLoad}>Cancel</button>
+                    <button className="px-4 py-2 rounded-lg border-none bg-danger hover:bg-red-600 text-white font-semibold text-[13px] min-w-[150px] flex items-center justify-center cursor-pointer transition-colors disabled:opacity-70 disabled:cursor-not-allowed" onClick={handleAbandon} disabled={actionLoad}>
+                      {actionLoad ? <Loader2 size={16} className="animate-spin text-white" /> : 'Abandon & Suspend'}
+                    </button>
+                  </div>
+                </>
+              )}
+
             </div>
           </div>
         )}
