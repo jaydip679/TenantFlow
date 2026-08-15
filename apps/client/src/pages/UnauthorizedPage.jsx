@@ -5,39 +5,24 @@ import { useNavigate } from 'react-router-dom';
 export default function UnauthorizedPage() {
   const navigate = useNavigate();
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexDirection: 'column',
-      gap: 24,
-      padding: 32,
-      textAlign: 'center',
-    }}>
-      <div style={{
-        width: 80, height: 80,
-        background: 'rgba(239,68,68,0.12)',
-        borderRadius: '50%',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginBottom: 8,
-      }}>
-        <ShieldOff size={36} color="#ef4444" />
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-8 text-center bg-background text-text-primary font-sans">
+      <div className="w-20 h-20 bg-danger/10 rounded-full flex items-center justify-center mb-2 shadow-sm">
+        <ShieldOff size={36} className="text-danger" />
       </div>
       <div>
-        <h1 style={{ fontSize: 48, fontWeight: 800, color: 'hsl(4,85%,60%)', lineHeight: 1 }}>403</h1>
-        <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text)', margin: '12px 0 8px' }}>
+        <h1 className="text-5xl font-extrabold text-danger leading-none">403</h1>
+        <h2 className="text-2xl font-semibold mt-3 mb-2">
           Access Denied
         </h2>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: 15, maxWidth: 400 }}>
+        <p className="text-text-muted text-[15px] max-w-[400px]">
           You don&apos;t have permission to access this page. Contact your administrator if you believe this is a mistake.
         </p>
       </div>
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button className="btn-secondary" onClick={() => navigate(-1)}>
-          ← Go Back
+      <div className="flex gap-3 mt-2">
+        <button className="px-5 py-2.5 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-sm font-semibold transition-colors flex items-center justify-center gap-1.5" onClick={() => navigate(-1)}>
+          &larr; Go Back
         </button>
-        <button className="btn-primary" onClick={() => navigate('/')}>
+        <button className="px-5 py-2.5 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-sm font-semibold transition-colors flex items-center justify-center" onClick={() => navigate('/')}>
           Go Home
         </button>
       </div>

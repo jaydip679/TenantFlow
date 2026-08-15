@@ -18,16 +18,10 @@ import {
 } from "lucide-react";
 import { logout } from "../../store/authSlice.js";
 import NotificationBell from "../notifications/NotificationBell.jsx";
+import ThemeToggle from "../common/ThemeToggle.jsx";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const SIDEBAR_W     = 240;
-const SIDEBAR_W_COL = 68;
-const ACCENT        = "#f59e0b";          // amber for super-admin flavour
-const BG_DEEP       = "#0a0a14";
-const BG_CARD       = "rgba(255,255,255,0.03)";
-const BORDER        = "rgba(255,255,255,0.07)";
-const TEXT_PRIMARY  = "#f0f0ff";
-const TEXT_MUTED    = "#8b8bad";
+const SIDEBAR_W = "w-[240px]";
+const SIDEBAR_W_COL = "w-[68px]";
 
 const navItems = [
   { to: "/admin",              icon: LayoutDashboard, label: "Dashboard",    end: true },
@@ -41,119 +35,55 @@ const navItems = [
   { to: "/admin/queues",       icon: Server,          label: "Queues" },
 ];
 
-const GLOBAL_CSS = `
-@keyframes tf-admin-glow {
-  0%,100% { box-shadow: 0 0 18px rgba(245,158,11,0.15); }
-  50%      { box-shadow: 0 0 28px rgba(245,158,11,0.32); }
-}
-.tf-admin-navlink {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 14px; border-radius: 10px;
-  text-decoration: none; color: ${TEXT_MUTED};
-  font-size: 14px; font-weight: 500; letter-spacing: 0.01em;
-  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
-  white-space: nowrap; overflow: hidden;
-}
-.tf-admin-navlink:hover { background: rgba(245,158,11,0.09); color: ${TEXT_PRIMARY}; }
-.tf-admin-navlink.active {
-  background: rgba(245,158,11,0.14);
-  color: #fbbf24;
-  box-shadow: inset 2px 0 0 ${ACCENT};
-  animation: tf-admin-glow 3s ease-in-out infinite;
-}
-`;
-
-let cssInjected = false;
-function injectCSS() {
-  if (!cssInjected && typeof document !== "undefined") {
-    const el = document.createElement("style");
-    el.textContent = GLOBAL_CSS;
-    document.head.appendChild(el);
-    cssInjected = true;
-  }
-}
-
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({ collapsed, onToggle }) {
-  injectCSS();
-  const w = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
+  const widthClass = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
 
   return (
     <aside
-      style={{
-        position: "fixed",
-        top: 0, left: 0, bottom: 0,
-        width: w,
-        zIndex: 100,
-        display: "flex",
-        flexDirection: "column",
-        background: "rgba(10,10,20,0.82)",
-        backdropFilter: "blur(24px) saturate(180%)",
-        WebkitBackdropFilter: "blur(24px) saturate(180%)",
-        borderRight: `1px solid ${BORDER}`,
-        boxShadow: "4px 0 40px rgba(0,0,0,0.5)",
-        transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)",
-        overflow: "hidden",
-      }}
+      className={`fixed top-0 left-0 bottom-0 z-50 flex flex-col bg-surface border-r border-border shadow-sm transition-all duration-200 ${widthClass} overflow-hidden`}
     >
       {/* Brand */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "20px 16px 18px",
-          borderBottom: `1px solid ${BORDER}`,
-          minHeight: 64,
-        }}
-      >
-        <div
-          style={{
-            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: `linear-gradient(135deg, ${ACCENT}, #f97316)`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 0 16px rgba(245,158,11,0.45)`,
-          }}
-        >
-          <ShieldCheck size={18} color="#fff" />
+      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-border min-h-[64px]">
+        <div className="w-9 h-9 rounded-lg shrink-0 bg-gradient-to-br from-warning to-amber-400 flex items-center justify-center shadow-sm">
+          <ShieldCheck size={18} className="text-white" />
         </div>
         {!collapsed && (
           <div>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT_PRIMARY, lineHeight: 1.1, whiteSpace: "nowrap" }}>TenantFlow</p>
-            <p style={{ margin: 0, fontSize: 10, fontWeight: 600, color: "#fbbf24", letterSpacing: "0.08em", textTransform: "uppercase" }}>Super Admin</p>
+            <p className="m-0 text-[15px] font-bold text-text-primary leading-tight whitespace-nowrap">TenantFlow</p>
+            <p className="m-0 text-[10px] font-semibold text-warning tracking-[0.08em] uppercase">Super Admin</p>
           </div>
         )}
       </div>
 
       {/* Navigation */}
-      <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
+      <nav className="flex-1 px-2 py-3 flex flex-col gap-1">
         {navItems.map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
-            className={({ isActive }) => `tf-admin-navlink${isActive ? " active" : ""}`}
             title={collapsed ? label : undefined}
+            className={({ isActive }) => 
+              `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap overflow-hidden ${
+                isActive 
+                  ? "bg-warning/10 text-warning" 
+                  : "text-text-muted hover:bg-surface-secondary hover:text-text-primary"
+              }`
+            }
           >
-            <Icon size={18} style={{ flexShrink: 0 }} />
+            <Icon size={18} className="shrink-0" />
             {!collapsed && label}
           </NavLink>
         ))}
       </nav>
 
       {/* Collapse toggle */}
-      <div style={{ padding: "12px 8px", borderTop: `1px solid ${BORDER}` }}>
+      <div className="p-3 border-t border-border">
         <button
           onClick={onToggle}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          style={{
-            width: "100%", padding: "9px 0", borderRadius: 9, border: "none",
-            background: BG_CARD, color: TEXT_MUTED, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "background 0.15s, color 0.15s",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(245,158,11,0.1)"; e.currentTarget.style.color = TEXT_PRIMARY; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = BG_CARD; e.currentTarget.style.color = TEXT_MUTED; }}
+          className="w-full py-2.5 rounded-lg border-none bg-surface-secondary text-text-muted hover:bg-border hover:text-text-primary flex items-center justify-center transition-colors cursor-pointer"
         >
           {collapsed ? <Menu size={18} /> : <X size={18} />}
         </button>
@@ -175,52 +105,28 @@ function TopBar({ sidebarWidth }) {
 
   return (
     <header
-      style={{
-        position: "fixed",
-        top: 0, left: sidebarWidth, right: 0,
-        height: 64,
-        zIndex: 99,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 24px",
-        background: "rgba(10,10,20,0.65)",
-        backdropFilter: "blur(20px)",
-        borderBottom: `1px solid ${BORDER}`,
-        transition: "left 0.22s cubic-bezier(0.4,0,0.2,1)",
-      }}
+      className="fixed top-0 right-0 h-16 z-40 flex items-center justify-between px-6 bg-surface/90 backdrop-blur-md border-b border-border transition-all duration-200"
+      style={{ left: sidebarWidth === SIDEBAR_W_COL ? 68 : 240 }}
     >
       {/* Title */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <ShieldCheck size={20} color={ACCENT} />
+      <div className="flex items-center gap-2.5">
+        <ShieldCheck size={20} className="text-warning" />
         <div>
-          <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: TEXT_PRIMARY, letterSpacing: "-0.01em" }}>Super Admin</p>
-          <p style={{ margin: 0, fontSize: 11, color: TEXT_MUTED }}>Platform Control Panel</p>
+          <p className="m-0 text-base font-bold text-text-primary tracking-tight">Super Admin</p>
+          <p className="m-0 text-xs text-text-muted">Platform Control Panel</p>
         </div>
       </div>
 
       {/* Actions */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <NotificationBell accentColor={ACCENT} />
+      <div className="flex items-center gap-3">
+        <ThemeToggle />
+        <NotificationBell />
 
-        <div
-          style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "6px 10px", borderRadius: 50,
-            background: BG_CARD, border: `1px solid ${BORDER}`,
-          }}
-        >
-          <div
-            style={{
-              width: 28, height: 28, borderRadius: "50%",
-              background: `linear-gradient(135deg, ${ACCENT}, #f97316)`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, color: "#fff",
-            }}
-          >
+        <div className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-full bg-surface-secondary border border-border">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-warning to-amber-400 flex items-center justify-center text-xs font-bold text-white shrink-0">
             {(user?.name ?? "A")[0].toUpperCase()}
           </div>
-          <span style={{ fontSize: 13, fontWeight: 500, color: TEXT_PRIMARY }}>
+          <span className="text-sm font-medium text-text-primary">
             {user?.name ?? "Admin"}
           </span>
         </div>
@@ -228,15 +134,7 @@ function TopBar({ sidebarWidth }) {
         <button
           onClick={handleLogout}
           title="Sign out"
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "8px 14px", borderRadius: 9, border: "none",
-            background: "rgba(239,68,68,0.1)",
-            color: "#f87171", cursor: "pointer", fontSize: 13, fontWeight: 500,
-            transition: "background 0.15s",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.2)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; }}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-danger/10 hover:bg-danger/20 text-danger text-sm font-medium transition-colors border-none cursor-pointer ml-1"
         >
           <LogOut size={15} />
           Sign out
@@ -249,22 +147,18 @@ function TopBar({ sidebarWidth }) {
 // ── Main Layout ───────────────────────────────────────────────────────────────
 export default function AdminLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
-  const sidebarWidth = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
+  const widthClass = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
 
   return (
-    <div style={{ minHeight: "100vh", background: BG_DEEP, color: TEXT_PRIMARY, fontFamily: "system-ui, sans-serif" }}>
+    <div className="min-h-screen bg-background text-text-primary font-sans">
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-      <TopBar sidebarWidth={sidebarWidth} />
+      <TopBar sidebarWidth={widthClass} />
 
       <main
-        style={{
-          marginLeft: sidebarWidth,
-          paddingTop: 64,
-          minHeight: "100vh",
-          transition: "margin-left 0.22s cubic-bezier(0.4,0,0.2,1)",
-        }}
+        className="min-h-screen pt-16 transition-all duration-200"
+        style={{ marginLeft: collapsed ? 68 : 240 }}
       >
-        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "32px 28px" }}>
+        <div className="max-w-[1400px] mx-auto px-7 py-8">
           {children}
         </div>
       </main>

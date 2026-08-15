@@ -5,49 +5,50 @@ import {
   Zap, Shield, BarChart3, Bell, Users, Brain,
   ArrowRight, Check, ChevronRight,
 } from 'lucide-react';
+import ThemeToggle from '../components/common/ThemeToggle.jsx';
 
 /* ── Static data ─────────────────────────────────────────────────────────────── */
 
 const FEATURES = [
   {
     icon: <Zap size={22} />,
-    color: 'hsl(252,100%,69%)',
-    bg:    'rgba(108,99,255,0.12)',
+    color: 'text-primary',
+    bg:    'bg-primary/10',
     title: 'Smart Billing',
     desc:  'Automatic invoicing, proration, and plan upgrades. Powered by Razorpay with HMAC-verified webhooks.',
   },
   {
     icon: <Brain size={22} />,
-    color: 'hsl(280,90%,65%)',
-    bg:    'rgba(160,90,255,0.12)',
+    color: 'text-accent',
+    bg:    'bg-accent/10',
     title: 'AI Churn Insights',
     desc:  'Nightly AI analysis predicts which tenants are at risk. Proactive outreach emails sent automatically.',
   },
   {
     icon: <BarChart3 size={22} />,
-    color: 'hsl(206,90%,55%)',
-    bg:    'rgba(59,130,246,0.12)',
+    color: 'text-blue-500',
+    bg:    'bg-blue-500/10',
     title: 'Revenue Analytics',
     desc:  'Live MRR, ARR, churn rate, and subscription counts — all in one admin dashboard.',
   },
   {
     icon: <Bell size={22} />,
-    color: 'hsl(38,95%,55%)',
-    bg:    'rgba(245,158,11,0.12)',
+    color: 'text-warning',
+    bg:    'bg-warning/10',
     title: 'Real-Time Notifications',
     desc:  'Socket.IO-powered instant alerts for payments, dunning, and plan changes.',
   },
   {
     icon: <Users size={22} />,
-    color: 'hsl(152,68%,44%)',
-    bg:    'rgba(16,185,129,0.12)',
+    color: 'text-emerald-500',
+    bg:    'bg-emerald-500/10',
     title: 'Team Management',
     desc:  'Invite members, assign roles, and manage seat limits per plan with fine-grained access control.',
   },
   {
     icon: <Shield size={22} />,
-    color: 'hsl(4,85%,58%)',
-    bg:    'rgba(239,68,68,0.12)',
+    color: 'text-danger',
+    bg:    'bg-danger/10',
     title: 'Dunning Automation',
     desc:  '4-step dunning state machine: 0, 3, 7, and 14-day retry attempts with tenant suspension.',
   },
@@ -96,181 +97,112 @@ export default function LandingPage() {
   const heroRef = useRef(null);
 
   return (
-    <div style={{ minHeight: '100vh', color: 'var(--color-text)', overflowX: 'hidden' }}>
+    <div className="min-h-screen bg-background text-text-primary overflow-x-hidden font-sans">
 
       {/* ── Nav ── */}
-      <nav style={{
-        position:   'sticky', top: 0, zIndex: 100,
-        background: 'rgba(10,10,20,0.85)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        padding: '0 clamp(24px, 5vw, 80px)',
-        height: 64,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
+      <nav className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md border-b border-border px-6 md:px-12 lg:px-20 h-16 flex items-center justify-between transition-colors duration-200">
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 34, height: 34,
-            background: 'linear-gradient(135deg, hsl(252,100%,69%), hsl(220,90%,60%))',
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 800, fontSize: 15, color: '#fff',
-            boxShadow: '0 4px 14px hsla(252,100%,69%,0.35)',
-          }}>TF</div>
-          <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: -0.3 }}>TenantFlow</span>
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center font-extrabold text-[15px] text-white bg-gradient-to-br from-primary to-emerald-400 shadow-sm shrink-0">
+            TF
+          </div>
+          <span className="font-bold text-lg tracking-tight">TenantFlow</span>
         </div>
 
         {/* Nav links (desktop) */}
-        <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
+        <div className="hidden md:flex gap-8 items-center">
           {['Features', 'Pricing'].map((label) => (
             <a key={label}
               href={`#${label.toLowerCase()}`}
-              style={{ color: 'var(--color-text-muted)', fontSize: 14, fontWeight: 500, textDecoration: 'none', transition: 'color 150ms' }}
-              onMouseEnter={(e) => { e.target.style.color = 'var(--color-text)'; }}
-              onMouseLeave={(e) => { e.target.style.color = 'var(--color-text-muted)'; }}
+              className="text-sm font-medium text-text-muted hover:text-text-primary transition-colors"
             >{label}</a>
           ))}
         </div>
 
         {/* CTA */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
           <button
             id="nav-login"
-            className="btn-ghost btn-sm"
+            className="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-lg border border-transparent bg-transparent text-text-muted hover:text-text-primary hover:bg-surface-secondary cursor-pointer text-sm font-semibold transition-colors"
             onClick={() => navigate('/login')}
           >
             Sign in
           </button>
           <button
             id="nav-signup"
-            className="btn-primary btn-sm"
+            className="px-4 py-2 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-sm font-semibold transition-colors flex items-center justify-center gap-1"
             onClick={() => navigate('/register')}
           >
-            Get started →
+            Get started &rarr;
           </button>
         </div>
       </nav>
 
       {/* ── Hero ── */}
-      <section ref={heroRef} style={{
-        padding: 'clamp(64px, 10vh, 120px) clamp(24px, 5vw, 80px)',
-        textAlign: 'center',
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
+      <section ref={heroRef} className="py-20 md:py-28 px-6 md:px-12 lg:px-20 text-center relative overflow-hidden">
         {/* Background glow blobs */}
-        <div style={{
-          position: 'absolute', top: '-20%', left: '30%',
-          width: 600, height: 600, borderRadius: '50%',
-          background: 'radial-gradient(circle, hsla(252,80%,50%,0.12) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '-10%', right: '20%',
-          width: 400, height: 400, borderRadius: '50%',
-          background: 'radial-gradient(circle, hsla(206,80%,50%,0.08) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
+        <div className="absolute -top-[20%] left-[30%] w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(22,163,74,0.08)_0%,transparent_70%)] pointer-events-none" />
+        <div className="absolute -bottom-[10%] right-[20%] w-[400px] h-[400px] rounded-full bg-[radial-gradient(circle,rgba(37,99,235,0.06)_0%,transparent_70%)] pointer-events-none" />
 
-        <div style={{ position: 'relative', maxWidth: 800, margin: '0 auto' }}>
+        <div className="relative max-w-4xl mx-auto">
           {/* Badge */}
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '5px 14px', borderRadius: 999,
-            background: 'rgba(108,99,255,0.12)',
-            border: '1px solid rgba(108,99,255,0.3)',
-            fontSize: 12, fontWeight: 600, color: 'hsl(252,100%,78%)',
-            marginBottom: 24, letterSpacing: 0.3,
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'hsl(152,68%,44%)', display: 'inline-block' }} />
-            Razorpay · Socket.IO · OpenAI — Production ready
+          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-6 tracking-wide">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+            Razorpay · Socket.IO · OpenAI &mdash; Production ready
           </span>
 
-          <h1 style={{
-            fontSize: 'clamp(38px, 6vw, 72px)',
-            fontWeight: 800,
-            letterSpacing: -2,
-            lineHeight: 1.1,
-            marginBottom: 20,
-            background: 'linear-gradient(135deg, #fff 20%, hsl(252,100%,78%) 60%, hsl(206,90%,65%))',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-          }}>
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6 text-transparent bg-clip-text bg-gradient-to-br from-text-primary via-text-primary to-text-muted">
             SaaS billing that<br />runs itself
           </h1>
 
-          <p style={{
-            fontSize: 'clamp(16px, 2vw, 20px)',
-            color: 'var(--color-text-muted)',
-            maxWidth: 560, margin: '0 auto 40px',
-            lineHeight: 1.65,
-          }}>
-            TenantFlow handles invoicing, dunning, plan upgrades, AI churn analysis, and real-time notifications — so you can focus on your product.
+          <p className="text-base md:text-lg text-text-muted max-w-2xl mx-auto mb-10 leading-relaxed">
+            TenantFlow handles invoicing, dunning, plan upgrades, AI churn analysis, and real-time notifications &mdash; so you can focus on your product.
           </p>
 
-          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div className="flex flex-wrap gap-3 justify-center">
             <button
               id="hero-cta-signup"
-              className="btn-primary"
-              style={{ padding: '13px 28px', fontSize: 15, gap: 8 }}
+              className="px-7 py-3 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-base font-semibold transition-colors flex items-center justify-center gap-2"
               onClick={() => navigate('/register')}
             >
-              Start free trial <ArrowRight size={16} />
+              Start free trial <ArrowRight size={18} />
             </button>
             <button
               id="hero-cta-login"
-              className="btn-secondary"
-              style={{ padding: '13px 28px', fontSize: 15 }}
+              className="px-7 py-3 rounded-lg border border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted cursor-pointer text-base font-semibold transition-colors flex items-center justify-center"
               onClick={() => navigate('/login')}
             >
               Sign in to dashboard
             </button>
           </div>
 
-          <p style={{ marginTop: 16, fontSize: 13, color: 'var(--color-text-subtle)' }}>
-            No credit card required · 14-day free trial
+          <p className="mt-5 text-sm text-text-muted/70">
+            No credit card required &middot; 14-day free trial
           </p>
         </div>
       </section>
 
       {/* ── Features ── */}
-      <section id="features" style={{ padding: 'clamp(48px, 8vh, 96px) clamp(24px, 5vw, 80px)' }}>
-        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <h2 style={{ fontSize: 'clamp(28px, 4vw, 42px)', fontWeight: 800, letterSpacing: -1, marginBottom: 12 }}>
+      <section id="features" className="py-20 md:py-24 px-6 md:px-12 lg:px-20 bg-surface-secondary/50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-3 text-text-primary">
               Everything you need, nothing you don&apos;t
             </h2>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 16, maxWidth: 480, margin: '0 auto' }}>
+            <p className="text-base text-text-muted max-w-xl mx-auto">
               A complete billing infrastructure stack built for modern SaaS teams.
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {FEATURES.map((f) => (
-              <div key={f.title} style={{
-                padding: 24,
-                background: 'rgba(255,255,255,0.025)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 16,
-                backdropFilter: 'blur(12px)',
-                transition: 'transform 200ms, box-shadow 200ms',
-                cursor: 'default',
-              }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 12px 32px rgba(0,0,0,0.4)`; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12,
-                  background: f.bg,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: f.color, marginBottom: 16,
-                }}>
+              <div key={f.title} className="p-6 bg-surface border border-border rounded-2xl transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-5 ${f.bg} ${f.color}`}>
                   {f.icon}
                 </div>
-                <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{f.title}</h3>
-                <p style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>{f.desc}</p>
+                <h3 className="text-lg font-bold mb-2 text-text-primary">{f.title}</h3>
+                <p className="text-sm text-text-secondary leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -278,48 +210,42 @@ export default function LandingPage() {
       </section>
 
       {/* ── Pricing ── */}
-      <section id="pricing" style={{ padding: 'clamp(48px, 8vh, 96px) clamp(24px, 5vw, 80px)' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <h2 style={{ fontSize: 'clamp(28px, 4vw, 42px)', fontWeight: 800, letterSpacing: -1, marginBottom: 12 }}>
+      <section id="pricing" className="py-20 md:py-24 px-6 md:px-12 lg:px-20">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-3 text-text-primary">
               Simple, transparent pricing
             </h2>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 16 }}>
+            <p className="text-base text-text-muted">
               Start free, scale as you grow. Cancel anytime.
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
             {PLANS.map((plan) => (
-              <div key={plan.name} style={{
-                padding: 28,
-                background: plan.featured ? 'rgba(108,99,255,0.06)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${plan.featured ? 'rgba(108,99,255,0.4)' : 'rgba(255,255,255,0.07)'}`,
-                borderRadius: 20,
-                position: 'relative',
-                boxShadow: plan.featured ? '0 0 0 1px rgba(108,99,255,0.2), 0 8px 32px rgba(0,0,0,0.3)' : 'none',
-              }}>
+              <div key={plan.name} className={`p-8 rounded-3xl relative transition-all duration-200 ${
+                plan.featured 
+                  ? 'bg-primary/5 border border-primary/30 shadow-xl shadow-primary/10 md:-translate-y-4' 
+                  : 'bg-surface border border-border'
+              }`}>
                 {plan.featured && (
-                  <span style={{
-                    position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
-                    background: 'linear-gradient(135deg, hsl(252,100%,69%), hsl(220,90%,60%))',
-                    color: '#fff', fontSize: 11, fontWeight: 700,
-                    padding: '3px 12px', borderRadius: 999, letterSpacing: 0.5,
-                  }}>Most Popular</span>
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary to-emerald-500 text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-full">
+                    Most Popular
+                  </span>
                 )}
 
-                <p style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
+                <p className="font-bold text-sm text-text-muted uppercase tracking-wider mb-3">
                   {plan.name}
                 </p>
-                <div style={{ marginBottom: 20 }}>
-                  <span style={{ fontSize: 40, fontWeight: 800, letterSpacing: -1 }}>{plan.price}</span>
-                  <span style={{ fontSize: 14, color: 'var(--color-text-muted)', marginLeft: 4 }}>/{plan.interval}</span>
+                <div className="mb-6 flex items-baseline gap-1">
+                  <span className="text-4xl md:text-5xl font-extrabold tracking-tight text-text-primary">{plan.price}</span>
+                  <span className="text-sm font-medium text-text-muted">/{plan.interval}</span>
                 </div>
 
-                <ul style={{ listStyle: 'none', marginBottom: 28, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <ul className="space-y-3 mb-8">
                   {plan.features.map((f) => (
-                    <li key={f} style={{ display: 'flex', gap: 10, fontSize: 14, color: 'var(--color-text-muted)', alignItems: 'center' }}>
-                      <Check size={14} color="hsl(152,68%,44%)" style={{ flexShrink: 0 }} />
+                    <li key={f} className="flex items-start gap-3 text-sm text-text-secondary">
+                      <Check size={16} className="text-primary shrink-0 mt-0.5" />
                       {f}
                     </li>
                   ))}
@@ -327,11 +253,14 @@ export default function LandingPage() {
 
                 <button
                   id={`plan-cta-${plan.name.toLowerCase()}`}
-                  className={plan.featured ? 'btn-primary btn-full' : 'btn-secondary btn-full'}
+                  className={`w-full py-2.5 rounded-lg border cursor-pointer text-sm font-semibold transition-colors flex items-center justify-center gap-1 ${
+                    plan.featured 
+                      ? 'border-none bg-primary hover:bg-primary-hover text-white' 
+                      : 'border-border bg-transparent text-text-muted hover:text-text-primary hover:border-text-muted'
+                  }`}
                   onClick={() => navigate('/register')}
-                  style={{ fontSize: 14 }}
                 >
-                  {plan.cta} {plan.featured && <ChevronRight size={14} />}
+                  {plan.cta} {plan.featured && <ChevronRight size={16} />}
                 </button>
               </div>
             ))}
@@ -340,30 +269,21 @@ export default function LandingPage() {
       </section>
 
       {/* ── Footer ── */}
-      <footer style={{
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        padding: '32px clamp(24px, 5vw, 80px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: 16,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            width: 26, height: 26,
-            background: 'linear-gradient(135deg, hsl(252,100%,69%), hsl(220,90%,60%))',
-            borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 800, color: '#fff',
-          }}>TF</div>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>TenantFlow</span>
+      <footer className="border-t border-border py-8 px-6 md:px-12 lg:px-20 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-md flex items-center justify-center font-bold text-[11px] text-white bg-gradient-to-br from-primary to-emerald-400">
+            TF
+          </div>
+          <span className="font-semibold text-sm text-text-primary">TenantFlow</span>
         </div>
-        <p style={{ fontSize: 13, color: 'var(--color-text-subtle)' }}>
-          © {new Date().getFullYear()} TenantFlow. Built with Node.js, React, Razorpay &amp; OpenAI.
+        <p className="text-xs text-text-muted text-center">
+          &copy; {new Date().getFullYear()} TenantFlow. Built with Node.js, React, Razorpay &amp; OpenAI.
         </p>
-        <div style={{ display: 'flex', gap: 20 }}>
+        <div className="flex gap-6">
           {['Privacy', 'Terms', 'Docs'].map((l) => (
-            <a key={l} href="#" style={{ fontSize: 13, color: 'var(--color-text-muted)', textDecoration: 'none' }}
-              onMouseEnter={(e) => { e.target.style.color = 'var(--color-text)'; }}
-              onMouseLeave={(e) => { e.target.style.color = 'var(--color-text-muted)'; }}
-            >{l}</a>
+            <a key={l} href="#" className="text-sm text-text-muted hover:text-text-primary transition-colors">
+              {l}
+            </a>
           ))}
         </div>
       </footer>

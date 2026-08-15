@@ -3,13 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import api from '../../services/api.js';
 import { Zap, CheckCircle2, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
-
-const BG      = 'linear-gradient(135deg,#0f0f1a 0%,#1a1a2e 50%,#16213e 100%)';
-const ACCENT  = '#6c63ff';
-const CARD    = 'rgba(255,255,255,0.04)';
-const BORDER  = 'rgba(255,255,255,0.1)';
-const TEXT    = '#f0f0ff';
-const MUTED   = '#8b8bad';
+import ThemeToggle from '../../components/common/ThemeToggle.jsx';
 
 const ROLE_LABELS = {
   tenant_member:  'Team Member',
@@ -75,45 +69,37 @@ export default function AcceptInvitePage() {
     }
   };
 
-  // ── Render helpers ──────────────────────────────────────────────────────────
-  const inp = {
-    width: '100%', padding: '10px 14px', borderRadius: 9,
-    border: `1px solid ${BORDER}`, background: 'rgba(255,255,255,0.05)',
-    color: TEXT, fontSize: 14, outline: 'none', boxSizing: 'border-box',
-    transition: 'border-color 0.15s',
-  };
-  const errTxt = { color: '#f87171', fontSize: 12, marginTop: 4 };
-
   return (
-    <div style={{ minHeight: '100vh', background: BG, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ width: '100%', maxWidth: 440 }}>
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 font-sans text-text-primary">
+      <div className="absolute top-6 right-6">
+        <ThemeToggle />
+      </div>
 
+      <div className="w-full max-w-[440px]">
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32, justifyContent: 'center' }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: `linear-gradient(135deg,${ACCENT},#a78bfa)`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 20px ${ACCENT}55` }}>
-            <Zap size={20} color="#fff" />
+        <div className="flex items-center justify-center gap-2.5 mb-8">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-emerald-400 flex items-center justify-center shadow-sm">
+            <Zap size={20} className="text-white" />
           </div>
-          <span style={{ fontSize: 20, fontWeight: 700, color: TEXT, letterSpacing: '-0.02em' }}>TenantFlow</span>
+          <span className="text-xl font-bold tracking-tight">TenantFlow</span>
         </div>
 
-        <div style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 20, padding: '36px 32px', backdropFilter: 'blur(12px)' }}>
-
+        <div className="bg-surface border border-border rounded-2xl p-8 sm:p-9 shadow-sm backdrop-blur-md">
           {/* Loading context */}
           {ctxLoading && (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: MUTED }}>
-              <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
-              <p style={{ margin: 0 }}>Validating your invitation…</p>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <div className="text-center py-8 text-text-muted">
+              <Loader2 size={32} className="animate-spin mx-auto mb-3" />
+              <p className="m-0 text-sm">Validating your invitation…</p>
             </div>
           )}
 
           {/* Invalid token */}
           {!ctxLoading && ctxError && (
-            <div style={{ textAlign: 'center' }}>
-              <AlertCircle size={40} color="#f87171" style={{ margin: '0 auto 16px' }} />
-              <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: TEXT }}>Invite Invalid</h2>
-              <p style={{ margin: '0 0 24px', fontSize: 14, color: MUTED, lineHeight: 1.6 }}>{ctxError}</p>
-              <button onClick={() => navigate('/login')} style={{ padding: '10px 24px', borderRadius: 9, border: 'none', background: ACCENT, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+            <div className="text-center">
+              <AlertCircle size={40} className="text-danger mx-auto mb-4" />
+              <h2 className="m-0 mb-2 text-xl font-bold text-text-primary">Invite Invalid</h2>
+              <p className="m-0 mb-6 text-sm text-text-muted leading-relaxed">{ctxError}</p>
+              <button onClick={() => navigate('/login')} className="px-6 py-2.5 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-sm font-semibold transition-colors">
                 Go to Login
               </button>
             </div>
@@ -121,13 +107,13 @@ export default function AcceptInvitePage() {
 
           {/* Success */}
           {!ctxLoading && !ctxError && done && (
-            <div style={{ textAlign: 'center' }}>
-              <CheckCircle2 size={48} color="#4ade80" style={{ margin: '0 auto 16px' }} />
-              <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: TEXT }}>You're in!</h2>
-              <p style={{ margin: '0 0 8px', fontSize: 14, color: MUTED }}>
-                Your account has been created. You can now log in to <strong style={{ color: TEXT }}>{context?.tenantName}</strong>.
+            <div className="text-center">
+              <CheckCircle2 size={48} className="text-success mx-auto mb-4" />
+              <h2 className="m-0 mb-2 text-xl font-bold text-text-primary">You&apos;re in!</h2>
+              <p className="m-0 mb-2 text-sm text-text-muted">
+                Your account has been created. You can now log in to <strong className="text-text-primary">{context?.tenantName}</strong>.
               </p>
-              <button onClick={() => navigate('/login')} style={{ marginTop: 24, padding: '10px 24px', borderRadius: 9, border: 'none', background: `linear-gradient(135deg,${ACCENT},#a78bfa)`, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+              <button onClick={() => navigate('/login')} className="mt-6 px-6 py-2.5 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-sm font-semibold transition-colors">
                 Log In Now
               </button>
             </div>
@@ -136,48 +122,48 @@ export default function AcceptInvitePage() {
           {/* Form */}
           {!ctxLoading && !ctxError && !done && context && (
             <>
-              <div style={{ marginBottom: 28 }}>
-                <h1 style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 700, color: TEXT }}>Accept Invitation</h1>
-                <p style={{ margin: 0, fontSize: 13, color: MUTED }}>
-                  You've been invited to join <strong style={{ color: TEXT }}>{context.tenantName}</strong> as{' '}
-                  <strong style={{ color: '#a78bfa' }}>{ROLE_LABELS[context.role] || context.role}</strong>.
+              <div className="mb-7">
+                <h1 className="m-0 mb-1.5 text-2xl font-bold text-text-primary">Accept Invitation</h1>
+                <p className="m-0 text-[13px] text-text-muted">
+                  You&apos;ve been invited to join <strong className="text-text-primary">{context.tenantName}</strong> as{' '}
+                  <strong className="text-primary">{ROLE_LABELS[context.role] || context.role}</strong>.
                 </p>
-                <p style={{ margin: '6px 0 0', fontSize: 12, color: MUTED }}>
-                  Joining as <strong style={{ color: TEXT }}>{context.email}</strong>
+                <p className="m-0 mt-1.5 text-xs text-text-muted">
+                  Joining as <strong className="text-text-primary">{context.email}</strong>
                 </p>
               </div>
 
               {submitErr && (
-                <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', fontSize: 13 }}>
+                <div className="mb-4 p-2.5 rounded-lg bg-danger/10 border border-danger/30 text-danger text-[13px]">
                   {submitErr}
                 </div>
               )}
 
-              <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>First Name</label>
+                    <label className="block text-xs font-semibold text-text-muted uppercase tracking-[0.06em] mb-1.5">First Name</label>
                     <input
                       {...register('firstName', { required: 'Required', minLength: { value: 2, message: 'Min 2 chars' } })}
                       placeholder="Jane"
-                      style={inp}
+                      className={`form-input ${errors.firstName ? 'border-danger focus:border-danger focus:ring-danger' : ''}`}
                     />
-                    {errors.firstName && <p style={errTxt}>{errors.firstName.message}</p>}
+                    {errors.firstName && <p className="text-danger text-xs mt-1">{errors.firstName.message}</p>}
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Last Name</label>
+                    <label className="block text-xs font-semibold text-text-muted uppercase tracking-[0.06em] mb-1.5">Last Name</label>
                     <input
                       {...register('lastName', { required: 'Required', minLength: { value: 2, message: 'Min 2 chars' } })}
                       placeholder="Smith"
-                      style={inp}
+                      className={`form-input ${errors.lastName ? 'border-danger focus:border-danger focus:ring-danger' : ''}`}
                     />
-                    {errors.lastName && <p style={errTxt}>{errors.lastName.message}</p>}
+                    {errors.lastName && <p className="text-danger text-xs mt-1">{errors.lastName.message}</p>}
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Password</label>
-                  <div style={{ position: 'relative' }}>
+                  <label className="block text-xs font-semibold text-text-muted uppercase tracking-[0.06em] mb-1.5">Password</label>
+                  <div className="relative">
                     <input
                       {...register('password', {
                         required: 'Password is required',
@@ -186,18 +172,18 @@ export default function AcceptInvitePage() {
                       })}
                       type={showPwd ? 'text' : 'password'}
                       placeholder="••••••••"
-                      style={{ ...inp, paddingRight: 40 }}
+                      className={`form-input pr-10 ${errors.password ? 'border-danger focus:border-danger focus:ring-danger' : ''}`}
                     />
-                    <button type="button" onClick={() => setShowPwd(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: 0 }}>
+                    <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none text-text-muted cursor-pointer p-0">
                       {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
-                  {errors.password && <p style={errTxt}>{errors.password.message}</p>}
+                  {errors.password && <p className="text-danger text-xs mt-1">{errors.password.message}</p>}
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Confirm Password</label>
-                  <div style={{ position: 'relative' }}>
+                  <label className="block text-xs font-semibold text-text-muted uppercase tracking-[0.06em] mb-1.5">Confirm Password</label>
+                  <div className="relative">
                     <input
                       {...register('confirm', {
                         required: 'Please confirm your password',
@@ -205,21 +191,21 @@ export default function AcceptInvitePage() {
                       })}
                       type={showConf ? 'text' : 'password'}
                       placeholder="••••••••"
-                      style={{ ...inp, paddingRight: 40 }}
+                      className={`form-input pr-10 ${errors.confirm ? 'border-danger focus:border-danger focus:ring-danger' : ''}`}
                     />
-                    <button type="button" onClick={() => setShowConf(v => !v)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: 0 }}>
+                    <button type="button" onClick={() => setShowConf(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none text-text-muted cursor-pointer p-0">
                       {showConf ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
-                  {errors.confirm && <p style={errTxt}>{errors.confirm.message}</p>}
+                  {errors.confirm && <p className="text-danger text-xs mt-1">{errors.confirm.message}</p>}
                 </div>
 
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{ marginTop: 8, padding: '12px', borderRadius: 10, border: 'none', background: `linear-gradient(135deg,${ACCENT},#a78bfa)`, color: '#fff', fontSize: 15, fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  className="mt-2 py-3 rounded-lg border-none bg-primary hover:bg-primary-hover text-white text-[15px] font-semibold cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
                 >
-                  {submitting ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Joining…</> : 'Join Workspace'}
+                  {submitting ? <><Loader2 size={16} className="animate-spin" /> Joining…</> : 'Join Workspace'}
                 </button>
               </form>
             </>

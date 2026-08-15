@@ -16,25 +16,10 @@ import {
 } from "lucide-react";
 import { logout } from "../../store/authSlice.js";
 import NotificationBell from "../notifications/NotificationBell.jsx";
+import ThemeToggle from "../common/ThemeToggle.jsx";
 
-// ── Shared design tokens ─────────────────────────────────────────────────────
-const SIDEBAR_W       = 240;
-const SIDEBAR_W_COL   = 68;
-const ACCENT          = "#6c63ff";
-const BG_DEEP         = "#0f0f1a";
-const BG_CARD         = "rgba(255,255,255,0.035)";
-const BORDER          = "rgba(255,255,255,0.08)";
-const TEXT_PRIMARY    = "#f0f0ff";
-const TEXT_MUTED      = "#8b8bad";
-
-const dropItemStyle = {
-  display: 'flex', alignItems: 'center', gap: 10,
-  width: '100%', padding: '9px 16px', border: 'none',
-  background: 'transparent', color: '#c4c4d4', cursor: 'pointer',
-  fontSize: 13, fontWeight: 500, textAlign: 'left',
-  transition: 'background 0.15s',
-};
-
+const SIDEBAR_W = "w-[240px]";
+const SIDEBAR_W_COL = "w-[68px]";
 
 // All possible nav items — filtered per role below
 const ALL_NAV_ITEMS = [
@@ -49,121 +34,55 @@ function getNavItems(role) {
   return ALL_NAV_ITEMS.filter(item => !item.roles || item.roles.includes(role));
 }
 
-// inject global CSS once
-const GLOBAL_CSS = `
-@keyframes tf-dash-glow {
-  0%,100% { box-shadow: 0 0 18px rgba(108,99,255,0.18); }
-  50%      { box-shadow: 0 0 30px rgba(108,99,255,0.38); }
-}
-.tf-navlink {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 14px; border-radius: 10px;
-  text-decoration: none; color: ${TEXT_MUTED};
-  font-size: 14px; font-weight: 500; letter-spacing: 0.01em;
-  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
-  white-space: nowrap; overflow: hidden;
-}
-.tf-navlink:hover { background: rgba(108,99,255,0.1); color: ${TEXT_PRIMARY}; }
-.tf-navlink.active {
-  background: rgba(108,99,255,0.18);
-  color: #a78bfa;
-  box-shadow: inset 2px 0 0 ${ACCENT};
-  animation: tf-dash-glow 3s ease-in-out infinite;
-}
-.tf-navlink-icon { flex-shrink: 0; }
-`;
-
-let cssInjected = false;
-function injectCSS() {
-  if (!cssInjected && typeof document !== "undefined") {
-    const el = document.createElement("style");
-    el.textContent = GLOBAL_CSS;
-    document.head.appendChild(el);
-    cssInjected = true;
-  }
-}
-
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 function Sidebar({ collapsed, onToggle, role }) {
-  injectCSS();
-  const w        = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
+  const widthClass = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
   const navItems = getNavItems(role);
 
   return (
     <aside
-      style={{
-        position: "fixed",
-        top: 0, left: 0, bottom: 0,
-        width: w,
-        zIndex: 100,
-        display: "flex",
-        flexDirection: "column",
-        background: "rgba(15,15,26,0.75)",
-        backdropFilter: "blur(24px) saturate(180%)",
-        WebkitBackdropFilter: "blur(24px) saturate(180%)",
-        borderRight: `1px solid ${BORDER}`,
-        boxShadow: "4px 0 40px rgba(0,0,0,0.4)",
-        transition: "width 0.22s cubic-bezier(0.4,0,0.2,1)",
-        overflow: "hidden",
-      }}
+      className={`fixed top-0 left-0 bottom-0 z-50 flex flex-col bg-surface border-r border-border shadow-sm transition-all duration-200 ${widthClass} overflow-hidden`}
     >
       {/* Logo / brand */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "20px 16px 18px",
-          borderBottom: `1px solid ${BORDER}`,
-          minHeight: 64,
-        }}
-      >
-        <div
-          style={{
-            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-            background: `linear-gradient(135deg, ${ACCENT}, #a78bfa)`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 0 16px rgba(108,99,255,0.5)`,
-          }}
-        >
-          <Zap size={18} color="#fff" />
+      <div className="flex items-center gap-2.5 px-4 py-4 border-b border-border min-h-[64px]">
+        <div className="w-9 h-9 rounded-lg shrink-0 bg-gradient-to-br from-primary to-emerald-400 flex items-center justify-center shadow-sm">
+          <Zap size={18} className="text-white" />
         </div>
         {!collapsed && (
-          <span style={{ fontSize: 18, fontWeight: 700, color: TEXT_PRIMARY, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>
+          <span className="text-lg font-bold text-text-primary tracking-tight whitespace-nowrap">
             TenantFlow
           </span>
         )}
       </div>
 
       {/* Nav links */}
-      <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
+      <nav className="flex-1 px-2 py-3 flex flex-col gap-1">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === "/dashboard"}
-            className={({ isActive }) => `tf-navlink${isActive ? " active" : ""}`}
             title={collapsed ? label : undefined}
+            className={({ isActive }) => 
+              `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap overflow-hidden ${
+                isActive 
+                  ? "bg-primary/10 text-primary" 
+                  : "text-text-muted hover:bg-surface-secondary hover:text-text-primary"
+              }`
+            }
           >
-            <Icon size={18} className="tf-navlink-icon" />
+            <Icon size={18} className="shrink-0" />
             {!collapsed && label}
           </NavLink>
         ))}
       </nav>
 
       {/* Collapse toggle at bottom */}
-      <div style={{ padding: "12px 8px", borderTop: `1px solid ${BORDER}` }}>
+      <div className="p-3 border-t border-border">
         <button
           onClick={onToggle}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          style={{
-            width: "100%", padding: "9px 0", borderRadius: 9, border: "none",
-            background: BG_CARD, color: TEXT_MUTED, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "background 0.15s, color 0.15s",
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(108,99,255,0.12)"; e.currentTarget.style.color = TEXT_PRIMARY; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = BG_CARD; e.currentTarget.style.color = TEXT_MUTED; }}
+          className="w-full py-2.5 rounded-lg border-none bg-surface-secondary text-text-muted hover:bg-border hover:text-text-primary flex items-center justify-center transition-colors cursor-pointer"
         >
           {collapsed ? <Menu size={18} /> : <X size={18} />}
         </button>
@@ -198,93 +117,62 @@ function TopBar({ sidebarWidth }) {
 
   return (
     <header
-      style={{
-        position: "fixed",
-        top: 0, left: sidebarWidth, right: 0,
-        height: 64,
-        zIndex: 99,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 24px",
-        background: "rgba(15,15,26,0.6)",
-        backdropFilter: "blur(20px)",
-        borderBottom: `1px solid ${BORDER}`,
-        transition: "left 0.22s cubic-bezier(0.4,0,0.2,1)",
-      }}
+      className="fixed top-0 right-0 h-16 z-40 flex items-center justify-between px-6 bg-surface/90 backdrop-blur-md border-b border-border transition-all duration-200"
+      style={{ left: sidebarWidth === SIDEBAR_W_COL ? 68 : 240 }}
     >
       {/* Tenant name */}
       <div>
-        <p style={{ margin: 0, fontSize: 13, color: TEXT_MUTED, fontWeight: 400 }}>Welcome back,</p>
-        <p style={{ margin: 0, fontSize: 16, color: TEXT_PRIMARY, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.01em" }}>
+        <p className="m-0 text-sm text-text-muted font-normal">Welcome back,</p>
+        <p className="m-0 text-base text-text-primary font-bold leading-tight tracking-tight">
           {user?.tenantName ?? user?.firstName ?? user?.name ?? "Tenant"}
         </p>
       </div>
 
       {/* Actions */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div className="flex items-center gap-3">
+        <ThemeToggle />
         <NotificationBell />
 
         {/* Avatar chip — clickable dropdown */}
-        <div ref={menuRef} style={{ position: 'relative' }}>
+        <div ref={menuRef} className="relative">
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "6px 12px 6px 6px", borderRadius: 50,
-              background: BG_CARD, border: `1px solid ${menuOpen ? 'rgba(108,99,255,0.5)' : BORDER}`,
-              cursor: 'pointer', transition: 'border-color 0.15s',
-            }}
+            className={`flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full bg-surface-secondary border transition-colors cursor-pointer ${
+              menuOpen ? 'border-primary/50' : 'border-border hover:border-border'
+            }`}
             aria-label="User menu"
           >
-            <div
-              style={{
-                width: 28, height: 28, borderRadius: "50%",
-                background: `linear-gradient(135deg, ${ACCENT}, #a78bfa)`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, fontWeight: 700, color: "#fff",
-              }}
-            >
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-emerald-400 flex items-center justify-center text-xs font-bold text-white shrink-0">
               {initials}
             </div>
-            <span style={{ fontSize: 13, fontWeight: 500, color: TEXT_PRIMARY }}>
+            <span className="text-sm font-medium text-text-primary hidden sm:block">
               {user?.firstName || user?.name || "User"}
             </span>
-            <ChevronDown size={14} color={TEXT_MUTED} style={{ transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+            <ChevronDown size={14} className={`text-text-muted transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Dropdown */}
           {menuOpen && (
-            <div style={{
-              position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-              minWidth: 180, borderRadius: 12, overflow: 'hidden',
-              background: '#1a1a2e', border: `1px solid ${BORDER}`,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-              zIndex: 200,
-            }}>
+            <div className="absolute top-[calc(100%+8px)] right-0 min-w-[180px] rounded-xl overflow-hidden bg-surface border border-border shadow-md z-50">
               {/* User info header */}
-              <div style={{ padding: '12px 16px', borderBottom: `1px solid ${BORDER}` }}>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT_PRIMARY }}>{user?.firstName} {user?.lastName}</p>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: TEXT_MUTED }}>{user?.email}</p>
+              <div className="px-4 py-3 border-b border-border">
+                <p className="m-0 text-sm font-semibold text-text-primary">{user?.firstName} {user?.lastName}</p>
+                <p className="mt-0.5 mb-0 text-xs text-text-muted truncate">{user?.email}</p>
               </div>
 
               {/* Menu items */}
-              <div style={{ padding: '6px 0' }}>
+              <div className="py-1.5">
                 <button
                   onClick={() => { setMenuOpen(false); navigate('/dashboard/profile'); }}
-                  style={dropItemStyle}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(108,99,255,0.12)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-transparent hover:bg-surface-secondary text-text-secondary hover:text-text-primary text-sm font-medium transition-colors text-left"
                 >
                   <User size={14} />
                   View Profile
                 </button>
-                <div style={{ height: 1, background: BORDER, margin: '4px 0' }} />
+                <div className="h-px bg-border my-1" />
                 <button
                   onClick={handleLogout}
-                  style={{ ...dropItemStyle, color: '#f87171' }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239,68,68,0.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 bg-transparent hover:bg-danger/10 text-danger text-sm font-medium transition-colors text-left"
                 >
                   <LogOut size={14} />
                   Sign Out
@@ -301,29 +189,19 @@ function TopBar({ sidebarWidth }) {
 // ── Layout ───────────────────────────────────────────────────────────────────
 export default function DashboardLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
-  const sidebarWidth = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
+  const widthClass = collapsed ? SIDEBAR_W_COL : SIDEBAR_W;
   const { user }     = useSelector((s) => s.auth);
 
   return (
-    <div style={{ minHeight: "100vh", background: BG_DEEP, color: TEXT_PRIMARY, fontFamily: "system-ui, sans-serif" }}>
+    <div className="min-h-screen bg-background text-text-primary font-sans">
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} role={user?.role} />
-      <TopBar sidebarWidth={sidebarWidth} />
+      <TopBar sidebarWidth={widthClass} />
 
       <main
-        style={{
-          marginLeft: sidebarWidth,
-          paddingTop: 64,
-          minHeight: "100vh",
-          transition: "margin-left 0.22s cubic-bezier(0.4,0,0.2,1)",
-        }}
+        className="min-h-screen pt-16 transition-all duration-200"
+        style={{ marginLeft: collapsed ? 68 : 240 }}
       >
-        <div
-          style={{
-            maxWidth: 1280,
-            margin: "0 auto",
-            padding: "32px 28px",
-          }}
-        >
+        <div className="max-w-7xl mx-auto px-7 py-8">
           {children}
         </div>
       </main>
