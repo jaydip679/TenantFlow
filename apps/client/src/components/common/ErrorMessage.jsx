@@ -1,79 +1,5 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { AlertCircle, X } from "lucide-react";
-
-const styles = {
-  wrapper: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 12,
-    padding: "14px 16px",
-    borderRadius: 10,
-    border: "1px solid rgba(239,68,68,0.35)",
-    background: "linear-gradient(135deg,rgba(239,68,68,0.12) 0%,rgba(185,28,28,0.08) 100%)",
-    backdropFilter: "blur(8px)",
-    boxShadow: "0 4px 24px rgba(239,68,68,0.08), inset 0 1px 0 rgba(255,255,255,0.04)",
-    position: "relative",
-    animation: "tf-fadeInDown 0.25s ease-out",
-  },
-  icon: {
-    flexShrink: 0,
-    color: "#f87171",
-    marginTop: 1,
-  },
-  body: {
-    flex: 1,
-    minWidth: 0,
-  },
-  code: {
-    display: "inline-block",
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: "0.1em",
-    textTransform: "uppercase",
-    color: "#fca5a5",
-    background: "rgba(239,68,68,0.2)",
-    borderRadius: 4,
-    padding: "2px 6px",
-    marginBottom: 4,
-  },
-  message: {
-    fontSize: 14,
-    lineHeight: 1.5,
-    color: "#fecaca",
-    margin: 0,
-    wordBreak: "break-word",
-  },
-  dismiss: {
-    flexShrink: 0,
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    padding: 4,
-    borderRadius: 6,
-    color: "#f87171",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "background 0.15s",
-  },
-};
-
-const fadeKeyframes = `
-@keyframes tf-fadeInDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0);    }
-}
-`;
-
-let injected = false;
-function injectAnim() {
-  if (!injected && typeof document !== "undefined") {
-    const el = document.createElement("style");
-    el.textContent = fadeKeyframes;
-    document.head.appendChild(el);
-    injected = true;
-  }
-}
 
 /**
  * ErrorMessage
@@ -84,7 +10,6 @@ function injectAnim() {
  *  - onDismiss  {function} optional callback; if omitted, a local state toggle is used
  */
 export default function ErrorMessage({ message, errorCode, onDismiss }) {
-  injectAnim();
   const [visible, setVisible] = useState(true);
 
   if (!visible || !message) return null;
@@ -98,21 +23,36 @@ export default function ErrorMessage({ message, errorCode, onDismiss }) {
   }
 
   return (
-    <div role="alert" aria-live="assertive" style={styles.wrapper}>
-      <AlertCircle size={18} style={styles.icon} />
+    <div
+      role="alert"
+      aria-live="assertive"
+      className="relative flex items-start gap-3 px-4 py-3.5 rounded-xl border border-danger/30 bg-danger/10 backdrop-blur-md shadow-[0_4px_24px_rgba(239,68,68,0.08),inset_0_1px_0_rgba(255,255,255,0.04)] animate-[tf-fadeInDown_0.25s_ease-out]"
+    >
+      <style>{`
+        @keyframes tf-fadeInDown {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+      
+      <AlertCircle size={18} className="shrink-0 text-danger mt-[1px]" />
 
-      <div style={styles.body}>
-        {errorCode && <span style={styles.code}>{errorCode}</span>}
-        <p style={styles.message}>{message}</p>
+      <div className="flex-1 min-w-0">
+        {errorCode && (
+          <span className="inline-block text-[10px] font-bold tracking-widest uppercase text-danger bg-danger/20 rounded px-1.5 py-0.5 mb-1">
+            {errorCode}
+          </span>
+        )}
+        <p className="m-0 text-sm leading-relaxed text-danger font-medium break-words">
+          {message}
+        </p>
       </div>
 
       <button
         type="button"
         aria-label="Dismiss error"
-        style={styles.dismiss}
+        className="shrink-0 flex items-center justify-center p-1 rounded-md bg-transparent border-none cursor-pointer text-danger hover:bg-danger/20 transition-colors"
         onClick={handleDismiss}
-        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.2)"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
       >
         <X size={16} />
       </button>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createOrder, verifyPayment } from '../../services/subscriptionService.js';
 import { loadScript, formatCurrency } from '../../utils/helpers.js';
 import { useSelector } from 'react-redux';
+import { Loader2 } from 'lucide-react';
 
 export default function RazorpayCheckout({ invoiceId, amount, tenantName, onSuccess, onFailure }) {
   const [loading, setLoading] = useState(false);
@@ -67,19 +68,18 @@ export default function RazorpayCheckout({ invoiceId, amount, tenantName, onSucc
   return (
     <div>
       {error && (
-        <div className="alert alert-danger" style={{ marginBottom: 8, fontSize: 13 }}>
+        <div className="mb-2 p-2 rounded-md bg-danger/10 border border-danger/20 text-danger text-xs font-medium">
           {error}
         </div>
       )}
       <button
         id={`pay-btn-${invoiceId}`}
-        className="btn-primary btn-sm"
+        className="px-3 py-1.5 rounded-lg border-none bg-primary hover:bg-primary-hover text-white cursor-pointer text-xs font-semibold transition-colors flex items-center justify-center min-w-[110px]"
         onClick={handlePay}
         disabled={loading}
-        style={{ minWidth: 110 }}
       >
         {loading ? (
-          <span className="btn-spinner" />
+          <Loader2 size={14} className="animate-spin" />
         ) : (
           `Pay ${formatCurrency(amount)}`
         )}

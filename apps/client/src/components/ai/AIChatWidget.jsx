@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, Bot, Minimize2, Maximize2, Loader } from 'lucide-react';
+import { Send, X, Bot, Minimize2, Maximize2, Loader2 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 
 /**
@@ -131,94 +131,40 @@ export default function AIChatWidget({ defaultOpen = false, embedded = false, on
       <button
         id="ai-chat-trigger"
         onClick={() => setOpen(true)}
-        style={{
-          position:     'fixed',
-          bottom:       24,
-          right:        24,
-          width:        52,
-          height:       52,
-          borderRadius: '50%',
-          background:   'linear-gradient(135deg, hsl(252,100%,69%), hsl(220,90%,60%))',
-          border:       'none',
-          boxShadow:    '0 4px 20px hsla(252,100%,69%,0.4)',
-          display:      'flex',
-          alignItems:   'center',
-          justifyContent: 'center',
-          cursor:       'pointer',
-          zIndex:       999,
-          transition:   'transform 200ms ease, box-shadow 200ms ease',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        className="fixed bottom-6 right-6 w-[52px] h-[52px] rounded-full bg-gradient-to-br from-primary to-blue-500 border-none shadow-[0_4px_20px_rgba(108,99,255,0.4)] flex items-center justify-center cursor-pointer z-[999] transition-transform duration-200 hover:scale-110"
         title="Open AI billing assistant"
       >
-        <Bot size={22} color="#fff" />
+        <Bot size={22} className="text-white" />
       </button>
     );
   }
 
-  const wrapperStyle = embedded ? {
-    display:       'flex',
-    flexDirection: 'column',
-    height:        '100%',
-    minHeight:     360,
-    borderRadius:  'var(--radius-lg)',
-    border:        '1px solid var(--glass-border)',
-    background:    'var(--glass-bg)',
-    backdropFilter: 'blur(20px)',
-    overflow:      'hidden',
-  } : {
-    position:      'fixed',
-    bottom:        24,
-    right:         24,
-    width:         360,
-    height:        minimised ? 52 : 520,
-    borderRadius:  'var(--radius-xl)',
-    background:    'rgba(15,15,26,0.92)',
-    border:        '1px solid rgba(108,99,255,0.3)',
-    boxShadow:     '0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(108,99,255,0.15)',
-    backdropFilter: 'blur(24px)',
-    display:       'flex',
-    flexDirection: 'column',
-    zIndex:        999,
-    overflow:      'hidden',
-    transition:    'height 250ms ease',
-  };
+  const wrapperClass = embedded 
+    ? "flex flex-col h-full min-h-[360px] rounded-2xl border border-border bg-surface overflow-hidden" 
+    : `fixed bottom-6 right-6 w-[360px] rounded-2xl bg-surface/95 border border-primary/30 shadow-[0_16px_48px_rgba(0,0,0,0.7),0_0_0_1px_rgba(108,99,255,0.15)] backdrop-blur-xl flex flex-col z-[999] overflow-hidden transition-all duration-300 ${minimised ? 'h-[52px]' : 'h-[520px]'}`;
 
   return (
-    <div id="ai-chat-widget" style={wrapperStyle}>
+    <div id="ai-chat-widget" className={wrapperClass}>
       {/* Header */}
-      <div style={{
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'space-between',
-        padding:        '12px 16px',
-        borderBottom:   minimised ? 'none' : '1px solid rgba(255,255,255,0.06)',
-        background:     'linear-gradient(135deg, rgba(108,99,255,0.2), rgba(59,130,246,0.1))',
-        flexShrink:     0,
-        cursor:         embedded ? 'default' : 'pointer',
-      }}
+      <div 
+        className={`flex items-center justify-between px-4 py-3 shrink-0 transition-colors ${minimised ? 'border-b-0' : 'border-b border-border'} ${embedded ? 'cursor-default' : 'cursor-pointer hover:bg-surface-secondary/50'} bg-gradient-to-br from-primary/20 to-blue-500/10`}
         onClick={!embedded ? () => setMinimised((m) => !m) : undefined}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: '50%',
-            background: 'linear-gradient(135deg, hsl(252,100%,69%), hsl(220,90%,60%))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Bot size={16} color="#fff" />
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center">
+            <Bot size={16} className="text-white" />
           </div>
           <div>
-            <p style={{ fontWeight: 600, fontSize: 13, color: '#fff', margin: 0 }}>TenantFlow AI</p>
-            <p style={{ fontSize: 11, color: 'hsl(252,80%,80%)', margin: 0 }}>Billing Assistant</p>
+            <p className="m-0 font-bold text-[13px] text-text-primary">TenantFlow AI</p>
+            <p className="m-0 text-[11px] text-primary">Billing Assistant</p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
           {!embedded && (
             <button
               onClick={() => setMinimised((m) => !m)}
-              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', padding: 4, cursor: 'pointer', borderRadius: 4 }}
+              className="p-1 rounded bg-transparent border-none text-text-muted hover:bg-surface-secondary hover:text-text-primary cursor-pointer transition-colors"
               title={minimised ? 'Expand' : 'Minimise'}
             >
               {minimised ? <Maximize2 size={14} /> : <Minimize2 size={14} />}
@@ -227,7 +173,7 @@ export default function AIChatWidget({ defaultOpen = false, embedded = false, on
           {!embedded && (
             <button
               onClick={handleClose}
-              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', padding: 4, cursor: 'pointer', borderRadius: 4 }}
+              className="p-1 rounded bg-transparent border-none text-text-muted hover:bg-surface-secondary hover:text-text-primary cursor-pointer transition-colors"
               title="Close"
             >
               <X size={14} />
@@ -239,44 +185,22 @@ export default function AIChatWidget({ defaultOpen = false, embedded = false, on
       {!minimised && (
         <>
           {/* Messages */}
-          <div style={{
-            flex:       1,
-            overflowY:  'auto',
-            padding:    '16px 12px',
-            display:    'flex',
-            flexDirection: 'column',
-            gap:        12,
-          }}>
+          <div className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-3">
             {messages.map((msg, i) => (
               <div
                 key={i}
-                style={{
-                  display:   'flex',
-                  justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  animation: 'fadeIn 0.2s ease',
-                }}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-[fadeIn_0.2s_ease]`}
               >
-                <div style={{
-                  maxWidth:     '82%',
-                  padding:      '9px 13px',
-                  borderRadius: msg.role === 'user'
-                    ? '14px 14px 4px 14px'
-                    : '14px 14px 14px 4px',
-                  background: msg.role === 'user'
-                    ? 'linear-gradient(135deg, hsl(252,80%,55%), hsl(220,80%,50%))'
-                    : 'rgba(255,255,255,0.06)',
-                  border: msg.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.08)',
-                  fontSize:    13,
-                  lineHeight:  1.55,
-                  color:       '#e8e8f0',
-                  whiteSpace:  'pre-wrap',
-                  wordBreak:   'break-word',
-                }}>
+                <div className={`max-w-[82%] px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap break-words ${
+                  msg.role === 'user'
+                    ? 'rounded-[14px_14px_4px_14px] bg-gradient-to-br from-primary to-blue-600 text-white border-none'
+                    : 'rounded-[14px_14px_14px_4px] bg-surface-secondary/50 text-text-primary border border-border'
+                }`}>
                   {msg.content || (
                     streaming && i === messages.length - 1 ? (
-                      <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                        <Loader size={12} style={{ animation: 'spin 0.8s linear infinite' }} />
-                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>thinking…</span>
+                      <span className="flex items-center gap-1.5">
+                        <Loader2 size={12} className="animate-spin text-text-muted" />
+                        <span className="text-xs text-text-muted">thinking…</span>
                       </span>
                     ) : null
                   )}
@@ -287,13 +211,7 @@ export default function AIChatWidget({ defaultOpen = false, embedded = false, on
           </div>
 
           {/* Input */}
-          <div style={{
-            padding:      '10px 12px',
-            borderTop:    '1px solid rgba(255,255,255,0.06)',
-            display:      'flex',
-            gap:          8,
-            flexShrink:   0,
-          }}>
+          <div className="px-3 py-2.5 border-t border-border flex gap-2 shrink-0">
             <textarea
               ref={inputRef}
               id="ai-chat-input"
@@ -302,49 +220,21 @@ export default function AIChatWidget({ defaultOpen = false, embedded = false, on
               onKeyDown={handleKeyDown}
               placeholder="Ask about invoices, plans, seats…"
               rows={1}
-              style={{
-                flex:        1,
-                background:  'rgba(255,255,255,0.06)',
-                border:      '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 10,
-                color:       '#e8e8f0',
-                fontSize:    13,
-                padding:     '9px 12px',
-                resize:      'none',
-                outline:     'none',
-                fontFamily:  'inherit',
-                lineHeight:  1.4,
-                maxHeight:   100,
-                overflowY:   'auto',
-                transition:  'border-color 150ms',
-              }}
-              onFocus={(e) => { e.target.style.borderColor = 'rgba(108,99,255,0.5)'; }}
-              onBlur={(e)  => { e.target.style.borderColor = 'rgba(255,255,255,0.1)'; }}
+              className="flex-1 bg-surface-secondary/50 border border-border rounded-xl text-text-primary text-[13px] px-3 py-2.5 resize-none outline-none font-sans leading-relaxed max-h-[100px] overflow-y-auto transition-colors focus:border-primary/50"
             />
             <button
               id="ai-chat-send"
               onClick={sendMessage}
               disabled={!input.trim() || streaming}
-              style={{
-                width:        38,
-                height:       38,
-                borderRadius: '50%',
-                background:   input.trim() && !streaming
-                  ? 'linear-gradient(135deg, hsl(252,100%,69%), hsl(220,90%,60%))'
-                  : 'rgba(255,255,255,0.08)',
-                border:       'none',
-                display:      'flex',
-                alignItems:   'center',
-                justifyContent: 'center',
-                cursor:       input.trim() && !streaming ? 'pointer' : 'not-allowed',
-                flexShrink:   0,
-                transition:   'background 150ms',
-                alignSelf:    'flex-end',
-              }}
+              className={`w-9 h-9 rounded-full border-none flex items-center justify-center shrink-0 self-end transition-colors ${
+                input.trim() && !streaming
+                  ? 'bg-gradient-to-br from-primary to-blue-500 cursor-pointer text-white'
+                  : 'bg-surface-secondary/50 text-text-muted/50 cursor-not-allowed'
+              }`}
             >
               {streaming
-                ? <Loader size={15} color="rgba(255,255,255,0.5)" style={{ animation: 'spin 0.8s linear infinite' }} />
-                : <Send size={15} color={input.trim() ? '#fff' : 'rgba(255,255,255,0.3)'} />
+                ? <Loader2 size={15} className="animate-spin text-white/50" />
+                : <Send size={15} />
               }
             </button>
           </div>

@@ -1,14 +1,9 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Bell } from "lucide-react";
 import { useNotifications } from "../../hooks/useNotifications.js";
 import NotificationList from "./NotificationList.jsx";
 
-/**
- * NotificationBell
- * Props:
- *  - accentColor  {string}  optional accent override (default #6c63ff)
- */
-export default function NotificationBell({ accentColor = "#6c63ff" }) {
+export default function NotificationBell() {
   const { unreadCount } = useNotifications();
   const [open, setOpen]    = useState(false);
   const containerRef       = useRef(null);
@@ -37,63 +32,27 @@ export default function NotificationBell({ accentColor = "#6c63ff" }) {
   const badgeCount = unreadCount > 99 ? "99+" : unreadCount;
 
   return (
-    <div ref={containerRef} style={{ position: "relative" }}>
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         aria-label={`Notifications${hasUnread ? ` (${badgeCount} unread)` : ""}`}
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((v) => !v)}
-        style={{
-          position: "relative",
-          width: 40, height: 40, borderRadius: "50%", border: "none",
-          background: open
-            ? `rgba(108,99,255,0.22)`
-            : "rgba(255,255,255,0.05)",
-          color: open ? accentColor : "#8b8bad",
-          cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          transition: "background 0.18s, color 0.18s, box-shadow 0.18s",
-          boxShadow: open ? `0 0 0 2px ${accentColor}44` : "none",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.1)";
-          e.currentTarget.style.color = "#f0f0ff";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = open ? "rgba(108,99,255,0.22)" : "rgba(255,255,255,0.05)";
-          e.currentTarget.style.color = open ? accentColor : "#8b8bad";
-        }}
+        className={`relative w-10 h-10 rounded-full border-none flex items-center justify-center cursor-pointer transition-all duration-200 outline-none
+          ${open ? 'bg-primary/20 text-primary shadow-[0_0_0_2px_var(--color-primary-40)]' : 'bg-surface-secondary/50 text-text-muted hover:bg-surface-secondary hover:text-text-primary'}`}
       >
         <Bell
           size={18}
-          style={{
-            transition: "transform 0.3s",
-            transform: open ? "rotate(-15deg)" : "rotate(0deg)",
-          }}
+          className="transition-transform duration-300"
+          style={{ transform: open ? "rotate(-15deg)" : "rotate(0deg)" }}
         />
 
         {/* Unread badge */}
         {hasUnread && (
           <span
             aria-hidden="true"
-            style={{
-              position: "absolute",
-              top: 4, right: 4,
-              minWidth: 16, height: 16,
-              padding: "0 3px",
-              borderRadius: 999,
-              background: "#ef4444",
-              color: "#fff",
-              fontSize: 9,
-              fontWeight: 700,
-              lineHeight: "16px",
-              textAlign: "center",
-              boxShadow: "0 0 8px rgba(239,68,68,0.6)",
-              border: "1.5px solid rgba(15,15,26,0.9)",
-              letterSpacing: 0,
-              userSelect: "none",
-            }}
+            className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-danger text-white text-[9px] font-bold leading-4 text-center shadow-[0_0_8px_rgba(239,68,68,0.6)] border-[1.5px] border-background select-none"
           >
             {badgeCount}
           </span>
@@ -102,14 +61,7 @@ export default function NotificationBell({ accentColor = "#6c63ff" }) {
 
       {/* Dropdown */}
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 10px)",
-            right: 0,
-            zIndex: 200,
-          }}
-        >
+        <div className="absolute top-[calc(100%+10px)] right-0 z-[200]">
           <NotificationList onClose={() => setOpen(false)} />
         </div>
       )}
